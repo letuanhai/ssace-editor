@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Ace Editor Injector",
+  "version": "1.0",
+  "description": "Inject Ace editor with Vim keybindings and SQL mode into web pages",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "action": {
+    "default_title": "Toggle Ace Editor"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "css": [
+        "editor.css"
+      ]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "editor.html",
+        "editor.js",
+        "lib/*.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+ ]
+}
