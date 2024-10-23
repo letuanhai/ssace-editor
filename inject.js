@@ -18,39 +18,37 @@
   // Load editor HTML
   frame.src = chrome.runtime.getURL('editor.html');
 
-  // Make container draggable
+  // Make the editor draggable
   let isDragging = false;
   let currentX;
   let currentY;
   let initialX;
   let initialY;
-  let xOffset = 0;
-  let yOffset = 0;
 
   container.addEventListener('mousedown', dragStart);
   document.addEventListener('mousemove', drag);
   document.addEventListener('mouseup', dragEnd);
 
   function dragStart(e) {
-    if (e.target === container) {
-      initialX = e.clientX - xOffset;
-      initialY = e.clientY - yOffset;
-      isDragging = true;
-    }
+      if (e.target === container || e.target.parentNode === container) {
+          initialX = e.clientX - container.offsetLeft;
+          initialY = e.clientY - container.offsetTop;
+          isDragging = true;
+      }
   }
 
   function drag(e) {
-    if (isDragging) {
-      e.preventDefault();
-      currentX = e.clientX - initialX;
-      currentY = e.clientY - initialY;
-      xOffset = currentX;
-      yOffset = currentY;
-      container.style.transform = `translate(${currentX}px, ${currentY}px)`;
-    }
+      if (isDragging) {
+          e.preventDefault();
+          currentX = e.clientX - initialX;
+          currentY = e.clientY - initialY;
+          container.style.left = currentX + "px";
+          container.style.top = currentY + "px";
+      }
   }
 
   function dragEnd() {
-    isDragging = false;
+      isDragging = false;
   }
+
 })();
