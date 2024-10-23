@@ -1,14 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "Ace Editor Injector",
+  "name": "SAS Studio Editor",
   "version": "1.0",
-  "description": "Inject Ace editor with Vim keybindings and SQL mode into web pages",
+  "description": "Use Ace editor with Vim keybindings and SQL mode to edit current file in SAS Studio",
   "permissions": [
     "activeTab",
     "scripting"
   ],
   "action": {
-    "default_title": "Toggle Ace Editor"
+    "default_title": "Activate Editor"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Period"
+      }
+    }
   },
   "content_scripts": [
     {
@@ -34,5 +41,5 @@
         "<all_urls>"
       ]
     }
- ]
+  ]
 }
