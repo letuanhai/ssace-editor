@@ -35,7 +35,7 @@
       "resources": [
         "editor.html",
         "editor.js",
-        "lib/*.js"
+        "lib/ace.js"
       ],
       "matches": [
         "<all_urls>"

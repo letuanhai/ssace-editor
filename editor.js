@@ -1,12 +1,23 @@
 const editorContainer = document.getElementById('ssace-editor');
-const editor = ace.edit("ssace-editor");
-editor.setTheme("ace/theme/monokai");
-editor.session.setMode("ace/mode/sql");
-editor.setKeyboardHandler("ace/keyboard/vim");
-editorContainer.style.fontSize = "medium";
-editor.setOptions({
-    fontSize: "14px"
+const editor = ace.edit("ssace-editor", {
+    mode: "ace/mode/sql",
+    keyboardHandler: "ace/keyboard/vim",
+    fontSize: 20,
+    showLineNumbers: true,
+    showGutter: true,
+    behavioursEnabled: true,
+    autoScrollEditorIntoView: true,
+    displayIndentGuides: true,
+    enableBasicAutocompletion: true,
+    enableLiveAutocompletion: true,
+    enableSnippets: true,
+    enableMultiselect: true,
+    highlightActiveLine: true,
+    highlightIndentGuides: true,
+    highlightSelectedWord: true,
+
 });
+editorContainer.style.fontSize = "medium";
 
 // Handle resize events to update editor size
 const resizeObserver = new ResizeObserver(() => {
