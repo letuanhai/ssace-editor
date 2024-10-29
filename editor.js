@@ -21,6 +21,8 @@ function initEditor(input, onwrite, onclose) {
         highlightSelectedWord: true,
     });
 
+    editor.focus();
+
     // Set up Vim
     const VimApi = ace.require("ace/keyboard/vim").Vim;
     VimApi.defineEx("write", "w", function (cm, input) {
