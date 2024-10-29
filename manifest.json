@@ -1,14 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "SAS Studio Editor",
+  "name": "SAS Studio-Ace Editor",
   "version": "1.0",
-  "description": "Use Ace editor with Vim keybindings and SQL mode to edit current file in SAS Studio",
+  "description": "Use Ace editor to edit files in SAS Studio",
   "permissions": [
     "activeTab",
     "scripting"
   ],
   "action": {
-    "default_title": "Activate Editor"
+    "default_title": "Activate editor"
   },
   "commands": {
     "_execute_action": {
@@ -17,25 +17,28 @@
       }
     }
   },
+  "background": {
+    "service_worker": "sw.js"
+  },
   "content_scripts": [
     {
       "matches": [
         "<all_urls>"
       ],
+      "js": [
+        "editor-container.js"
+      ],
       "css": [
-        "editor.css"
+        "editor-container.css"
       ]
     }
   ],
-  "background": {
-    "service_worker": "background.js"
-  },
   "web_accessible_resources": [
     {
       "resources": [
-        "editor.html",
+        "lib/*.js",
         "editor.js",
-        "lib/ace.js"
+        "editor.html"
       ],
       "matches": [
         "<all_urls>"
