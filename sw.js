@@ -7,7 +7,7 @@ function addListenerToMain(extension_id) {
         if (msg.origin !== extension_origin) return;
 
 
-        console.debug('MAIN: got message from iframe: ', msg);
+        // console.debug('MAIN: got message from iframe: ', msg);
         switch (msg.data.action) {
             case 'GetTextFromSS':
                 msg.source.postMessage({
