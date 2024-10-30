@@ -20,7 +20,7 @@ function initEditor(input, onwrite, onclose) {
         highlightIndentGuides: true,
         highlightSelectedWord: true,
     });
-
+    // Focus on editor on launch
     editor.focus();
 
     // Set up Vim
@@ -55,22 +55,18 @@ function initEditor(input, onwrite, onclose) {
 
 // Listen to init request from container and request input from SAS Studio
 chrome.runtime.onMessage.addListener((msg, sender) => {
-    // console.debug('iframe: got message: ', msg);
 
     if (msg.action == 'InitEditor') {
 
-        // console.debug('iframe: init editor');
 
         // Listen to input result from SAS Studio
         window.addEventListener('message', (event) => {
-            // console.debug('iframe: got message from MAIN: ', event);
 
             if (event.origin !== sender.origin) return;
             if (event.data.action !== 'TextResultFromSS') return;
 
             initEditor(event.data,
                 (editor) => {
-                    // console.log('Editor received save request from ', sender);
                     window.parent.postMessage({
                         action: 'SetTextInSS',
                         textContent: editor.getValue(),

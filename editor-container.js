@@ -82,7 +82,6 @@
             });
         };
         editorFrame.onload = () => {
-            // console.debug('Request editorFrame to init editor!')
             chrome.runtime.sendMessage({
                 action: 'InitEditor',
             });
