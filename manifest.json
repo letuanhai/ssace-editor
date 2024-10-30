@@ -25,19 +25,6 @@
   "background": {
     "service_worker": "sw.js"
   },
-  "content_scripts": [
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "editor-container.js"
-      ],
-      "css": [
-        "editor-container.css"
-      ]
-    }
-  ],
   "web_accessible_resources": [
     {
       "resources": [

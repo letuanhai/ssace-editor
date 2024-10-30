@@ -13,7 +13,7 @@ function addListenerToMain(extension_id) {
                 msg.source.postMessage({
                     action: 'TextResultFromSS',
                     textContent: window.appDMS.tabs.getFocusedTab().editor.editor.getText(),
-                    lineNumber: document.querySelector('.textviewLeftRuler > div.ruler.lines > div:nth-child(2)').textContent,
+                    lineNumber: document.querySelector('.textviewLeftRuler > div.ruler.lines > div:nth-child(3)').textContent,
                 }, extension_origin);
                 break;
             case 'SetTextInSS':
@@ -36,8 +36,13 @@ chrome.action.onClicked.addListener((tab) => {
         world: "MAIN"
     });
 
+    chrome.scripting.insertCSS({
+        target: { tabId: tab.id },
+        files: ['editor-container.css']
+    });
+
     chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: () => { window.createSSAceEditor() },
+        files: ['editor-container.js']
     });
 });

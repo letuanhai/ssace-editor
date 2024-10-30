@@ -89,6 +89,6 @@
         };
     }
 
-    window.createSSAceEditor = createEditorContainer;
+    createEditorContainer();
 
 })();
