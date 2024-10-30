@@ -9,15 +9,17 @@ function addListenerToMain(extension_id) {
 
         switch (msg.data.action) {
             case 'GetTextFromSS':
+                var ctrl = window.appDMS.tabs.getFocusedTab().editor.editor.ctrl_;
                 msg.source.postMessage({
                     action: 'TextResultFromSS',
-                    textContent: window.appDMS.tabs.getFocusedTab().editor.editor.getText(),
-                    lineNumber: document.querySelector('.textviewLeftRuler > div.ruler.lines > div:nth-child(3)').textContent,
+                    textContent: ctrl.getText(),
+                    lineNumber: ctrl.model().toTextRange(ctrl.selection()).start.line + 1,
                 }, extension_origin);
                 break;
             case 'SetTextInSS':
-                window.appDMS.tabs.getFocusedTab().editor.editor.setText(msg.data.textContent);
-                window.appDMS.tabs.getFocusedTab().editor.editor.gotoLine(msg.data.lineNumber);
+                var ctrl = window.appDMS.tabs.getFocusedTab().editor.editor.ctrl_;
+                ctrl.setText(msg.data.textContent);
+                ctrl.gotoline(msg.data.lineNumber + 1);
                 break;
             case 'CloseEditorContainer':
                 document.getElementById('ssace-editor-container').remove();
