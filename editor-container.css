@@ -1,12 +1,12 @@
 :root {
-  --ssace-fg: black;
-  --ssace-bg: white;
+  --ssace-fg: #505050;
+  --ssace-bg: #e6e6e6;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ssace-fg: white;
-    --ssace-bg: black;
+    --ssace-bg: #505050;
+    --ssace-fg: #e6e6e6;
   }
 }
 
@@ -53,6 +53,7 @@
   color: var(--ssace-fg);
   padding: 0 8px;
   cursor: pointer;
+  border: none;
   border-radius: 3px;
 }
 
