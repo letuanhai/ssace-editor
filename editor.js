@@ -1,11 +1,17 @@
 function initEditor(input, onwrite, onclose, onmaximize) {
-    const editorEl = document.getElementById("ssace-editor");
-    editorEl.style.fontSize = '14px';
+    // Set default dark and light theme
+    const darkTheme = 'ace/theme/gruvbox';
+    const lightTheme = 'ace/theme/textmate';
+
+    // Choose theme based on system dark mode
+    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    let editorTheme = isDarkMode ? darkTheme : lightTheme;
+
     // Initialize Ace editor
     const editor = ace.edit("ssace-editor", {
         mode: "ace/mode/sas",
         keyboardHandler: "ace/keyboard/vim",
-        // theme:"ace/theme/monokai",
+        theme: editorTheme,
         fontSize: 14,
         showLineNumbers: true,
         showGutter: true,
@@ -22,6 +28,12 @@ function initEditor(input, onwrite, onclose, onmaximize) {
     });
     // Focus on editor on launch
     editor.focus();
+
+    // Watch for dark mode change
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+        editorTheme = event.matches ? darkTheme : lightTheme;
+        editor.setTheme(editorTheme);
+    });
 
     // Key bindings
     editor.commands.addCommand({
@@ -57,6 +69,7 @@ function initEditor(input, onwrite, onclose, onmaximize) {
     });
 
     // Handle resize events to update editor size
+    const editorEl = document.getElementById("ssace-editor");
     const resizeObserver = new ResizeObserver(() => {
         editor.resize();
     });
@@ -86,19 +99,19 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
             if (event.data.action !== 'TextResultFromSS') return;
 
             initEditor(event.data,
-                onwrite=(editor) => {
+                onwrite = (editor) => {
                     window.parent.postMessage({
                         action: 'SetTextInSS',
                         textContent: editor.getValue(),
                         lineNumber: editor.getSelectionRange().start.row,
                     }, sender.origin);
                 },
-                onclose=(editor) => {
+                onclose = (editor) => {
                     window.parent.postMessage({
                         action: 'CloseEditorContainer',
                     }, sender.origin);
                 },
-                onmaximize=(editor) => {
+                onmaximize = (editor) => {
                     window.parent.postMessage({
                         action: 'MaximizeRestoreEditorContainer',
                     }, sender.origin);
