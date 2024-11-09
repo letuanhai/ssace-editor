@@ -1,8 +1,12 @@
 (function () {
     // Create and initialize the editor
     function createEditorContainer() {
-        // Ignore if editorContainer existed
-        if (document.getElementById('ssace-editor-container')) return;
+        // Remove editorContainer if existed
+        const existingEditorContainer = document.getElementById('ssace-editor-container');
+        if (existingEditorContainer) {
+            existingEditorContainer.remove();
+            return;
+        }
 
         // Create container for the editor
         const editorContainer = document.createElement('div');
