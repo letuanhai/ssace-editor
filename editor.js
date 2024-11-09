@@ -23,6 +23,16 @@ function initEditor(input, onwrite, onclose) {
     // Focus on editor on launch
     editor.focus();
 
+    // Key bindings
+    editor.commands.addCommand({
+        name: 'Save and quit',
+        bindKey: 'Ctrl-S',
+        exec: function (editor) {
+            onwrite(editor);
+            onclose(editor);
+        },
+    });
+
     // Set up Vim
     const VimApi = ace.require("ace/keyboard/vim").Vim;
     VimApi.defineEx("write", "w", function (cm, input) {
