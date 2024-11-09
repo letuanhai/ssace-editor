@@ -6,7 +6,6 @@ function addListenerToMain(extension_id) {
     window.addEventListener('message', (msg) => {
         if (msg.origin !== extension_origin) return;
 
-
         switch (msg.data.action) {
             case 'GetTextFromSS':
                 var ctrl = window.appDMS.tabs.getFocusedTab().editor.editor.ctrl_;
@@ -23,6 +22,22 @@ function addListenerToMain(extension_id) {
                 break;
             case 'CloseEditorContainer':
                 document.getElementById('ssace-editor-container').remove();
+                break;
+            case 'MaximizeRestoreEditorContainer':
+                const editorContainer = document.getElementById('ssace-editor-container');
+                // Resize editor container to cover whole page
+                //  and restore to default size and position if already maximized
+                if (editorContainer.style.width !== '100%') {
+                    editorContainer.style.width = '100%';
+                    editorContainer.style.height = '100%';
+                    editorContainer.style.top = '0';
+                    editorContainer.style.left = '0';
+                } else {
+                    editorContainer.style.width = '';
+                    editorContainer.style.height = '';
+                    editorContainer.style.top = '';
+                    editorContainer.style.left = '';
+                }
                 break;
         }
     });

@@ -1,4 +1,4 @@
-function initEditor(input, onwrite, onclose) {
+function initEditor(input, onwrite, onclose, onmaximize) {
     const editorEl = document.getElementById("ssace-editor");
     editorEl.style.fontSize = '14px';
     // Initialize Ace editor
@@ -32,6 +32,13 @@ function initEditor(input, onwrite, onclose) {
             onclose(editor);
         },
     });
+    editor.commands.addCommand({
+        name: 'Maximize/Restore editor container',
+        bindKey: 'Ctrl-Alt-M',
+        exec: function (editor) {
+            onmaximize(editor);
+        },
+    });
 
     // Set up Vim
     const VimApi = ace.require("ace/keyboard/vim").Vim;
@@ -44,6 +51,9 @@ function initEditor(input, onwrite, onclose) {
     VimApi.defineEx("wquit", "wq", function (cm, input) {
         onwrite(editor);
         onclose(editor);
+    });
+    VimApi.defineEx("maximize", "ma", function (cm, input) {
+        onmaximize(editor);
     });
 
     // Handle resize events to update editor size
@@ -76,18 +86,23 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
             if (event.data.action !== 'TextResultFromSS') return;
 
             initEditor(event.data,
-                (editor) => {
+                onwrite=(editor) => {
                     window.parent.postMessage({
                         action: 'SetTextInSS',
                         textContent: editor.getValue(),
                         lineNumber: editor.getSelectionRange().start.row,
                     }, sender.origin);
                 },
-                (editor) => {
+                onclose=(editor) => {
                     window.parent.postMessage({
                         action: 'CloseEditorContainer',
                     }, sender.origin);
-                }
+                },
+                onmaximize=(editor) => {
+                    window.parent.postMessage({
+                        action: 'MaximizeRestoreEditorContainer',
+                    }, sender.origin);
+                },
             );
         });
 
