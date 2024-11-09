@@ -3,7 +3,7 @@ function initEditor(input, onwrite, onclose) {
     editorEl.style.fontSize = '14px';
     // Initialize Ace editor
     const editor = ace.edit("ssace-editor", {
-        mode: "ace/mode/sql",
+        mode: "ace/mode/sas",
         keyboardHandler: "ace/keyboard/vim",
         // theme:"ace/theme/monokai",
         fontSize: 14,
