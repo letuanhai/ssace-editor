@@ -22,6 +22,12 @@
         saveBtn.id = 'ssace-editor-btn-save';
         saveBtn.className = 'ssace-editor-btn';
 
+        // Maximize/restore button
+        const maximizeBtn = document.createElement('button');
+        maximizeBtn.textContent = '≣';
+        maximizeBtn.id = 'ssace-editor-btn-maximize';
+        maximizeBtn.className = 'ssace-editor-btn';
+
         // Close button
         const closeBtn = document.createElement('button');
         closeBtn.textContent = '×';
@@ -35,6 +41,7 @@
 
         // Assemble the components
         btnContainer.appendChild(saveBtn);
+        btnContainer.appendChild(maximizeBtn);
         btnContainer.appendChild(closeBtn);
         headerBar.appendChild(document.createElement('div')); // Spacer
         headerBar.appendChild(btnContainer);
@@ -76,11 +83,29 @@
         closeBtn.onclick = () => {
             editorContainer.remove();
         };
+
         saveBtn.onclick = () => {
             chrome.runtime.sendMessage({
                 action: 'SaveEditor',
             });
         };
+
+        maximizeBtn.onclick = () => {
+            // Resize editor container to cover whole page
+            //  and restore to default size and position if already maximized
+            if (editorContainer.style.width !== '100%') {
+                editorContainer.style.width = '100%';
+                editorContainer.style.height = '100%';
+                editorContainer.style.top = '0';
+                editorContainer.style.left = '0';
+            } else {
+                editorContainer.style.width = '';
+                editorContainer.style.height = '';
+                editorContainer.style.top = '';
+                editorContainer.style.left = '';
+            }
+        };
+
         editorFrame.onload = () => {
             chrome.runtime.sendMessage({
                 action: 'InitEditor',

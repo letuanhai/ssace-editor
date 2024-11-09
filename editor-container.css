@@ -71,6 +71,14 @@
   background-color: #4f87bb;
 }
 
+#ssace-editor-btn-maximize {
+  font-size: 20px;
+}
+
+#ssace-editor-btn-maximize:hover {
+  background-color: #4f87bb;
+}
+
 #ssace-editor-btn-close {
   font-size: 20px;
 }
