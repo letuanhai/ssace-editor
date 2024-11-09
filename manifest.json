@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "SAS Studio-Ace Editor",
+  "name": "SAS Studio - Ace Editor",
   "version": "1.0",
   "description": "Use Ace editor to edit current file in SAS Studio",
   "icons": {
