@@ -1,7 +1,7 @@
 function initEditor(input, onwrite, onclose, onmaximize) {
     // Set default dark and light theme
     const darkTheme = 'ace/theme/gruvbox';
-    const lightTheme = 'ace/theme/textmate';
+    const lightTheme = 'ace/theme/iplastic';
 
     // Choose theme based on system dark mode
     const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -12,7 +12,7 @@ function initEditor(input, onwrite, onclose, onmaximize) {
         mode: "ace/mode/sas",
         keyboardHandler: "ace/keyboard/vim",
         theme: editorTheme,
-        fontSize: 14,
+        fontSize: 15,
         showLineNumbers: true,
         showGutter: true,
         displayIndentGuides: true,
