@@ -1,11 +1,20 @@
-function initEditor(input, onwrite, onclose, onmaximize) {
+async function initEditor(input, onwrite, onclose, onmaximize) {
+    // Get user editor settings from storage
+    let userSettings = {};
+    await chrome.storage.sync.get(["editorSettings"]).then((result) => {
+        userSettings = result.editorSettings || userSettings;
+    });
+
     // Set default dark and light theme
-    const darkTheme = 'ace/theme/gruvbox';
-    const lightTheme = 'ace/theme/iplastic';
+    const darkTheme = userSettings.darkTheme || 'ace/theme/gruvbox';
+    const lightTheme = userSettings.lightTheme || 'ace/theme/iplastic';
+    // Remove the properties to avoid warning messages
+    delete userSettings.darkTheme;
+    delete userSettings.lightTheme;
 
     // Choose theme based on system dark mode
     const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    let editorTheme = isDarkMode ? darkTheme : lightTheme;
+    const editorTheme = isDarkMode ? darkTheme : lightTheme;
 
     // Initialize Ace editor
     const editor = ace.edit("ssace-editor", {
@@ -19,20 +28,21 @@ function initEditor(input, onwrite, onclose, onmaximize) {
         behavioursEnabled: true,
         autoScrollEditorIntoView: true,
         enableBasicAutocompletion: true,
-        enableLiveAutocompletion: true,   // Shows completion list as you type
+        enableLiveAutocompletion: true,
         enableSnippets: true,
         tooltipFollowsMouse: true,
         highlightActiveLine: true,
         highlightIndentGuides: true,
         highlightSelectedWord: true,
+        ...userSettings, // Use user settings if available
     });
     // Focus on editor on launch
     editor.focus();
 
     // Watch for dark mode change
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
-        editorTheme = event.matches ? darkTheme : lightTheme;
-        editor.setTheme(editorTheme);
+        const newEditorTheme = event.matches ? darkTheme : lightTheme;
+        editor.setTheme(newEditorTheme);
     });
 
     // Key bindings
@@ -49,6 +59,76 @@ function initEditor(input, onwrite, onclose, onmaximize) {
         bindKey: 'Ctrl-Alt-M',
         exec: function (editor) {
             onmaximize(editor);
+        },
+    });
+    editor.commands.addCommand({
+        name: 'Save current editor settings',
+        bindKey: 'Ctrl-Alt-S',
+        exec: function (editor) {
+            let currentSettings = {
+                mode: editor.getOption("mode"),
+                keyboardHandler: editor.getOption("keyboardHandler"),
+                fontSize: editor.getOption("fontSize"),
+                wrap: editor.getOption("wrap"),
+                cursorStyle: editor.getOption("cursorStyle"),
+                foldStyle: editor.getOption("foldStyle"),
+                useSoftTabs: editor.getOption("useSoftTabs"),
+                tabSize: editor.getOption("tabSize"),
+                scrollPastEnd: editor.getOption("scrollPastEnd"),
+                navigateWithinSoftTabs: editor.getOption("navigateWithinSoftTabs"),
+                behavioursEnabled: editor.getOption("behavioursEnabled"),
+                wrapBehavioursEnabled: editor.getOption("wrapBehavioursEnabled"),
+                enableAutoIndent: editor.getOption("enableAutoIndent"),
+                selectionStyle: editor.getOption("selectionStyle"),
+                highlightActiveLine: editor.getOption("highlightActiveLine"),
+                showInvisibles: editor.getOption("showInvisibles"),
+                displayIndentGuides: editor.getOption("displayIndentGuides"),
+                highlightIndentGuides: editor.getOption("highlightIndentGuides"),
+                hScrollBarAlwaysVisible: editor.getOption("hScrollBarAlwaysVisible"),
+                vScrollBarAlwaysVisible: editor.getOption("vScrollBarAlwaysVisible"),
+                animatedScroll: editor.getOption("animatedScroll"),
+                showGutter: editor.getOption("showGutter"),
+                showLineNumbers: editor.getOption("showLineNumbers"),
+                relativeLineNumbers: editor.getOption("relativeLineNumbers"),
+                fixedWidthGutter: editor.getOption("fixedWidthGutter"),
+                showPrintMargin: editor.getOption("showPrintMargin"),
+                printMarginColumn: editor.getOption("printMarginColumn"),
+                indentedSoftWrap: editor.getOption("indentedSoftWrap"),
+                highlightSelectedWord: editor.getOption("highlightSelectedWord"),
+                fadeFoldWidgets: editor.getOption("fadeFoldWidgets"),
+                useTextareaForIME: editor.getOption("useTextareaForIME"),
+                mergeUndoDeltas: editor.getOption("mergeUndoDeltas"),
+                useElasticTabstops: editor.getOption("useElasticTabstops"),
+                useIncrementalSearch: editor.getOption("useIncrementalSearch"),
+                readOnly: editor.getOption("readOnly"),
+                copyWithEmptySelection: editor.getOption("copyWithEmptySelection"),
+                enableLiveAutocompletion: editor.getOption("enableLiveAutocompletion"),
+                customScrollbar: editor.getOption("customScrollbar"),
+                useSvgGutterIcons: editor.getOption("useSvgGutterIcons"),
+                showFoldedAnnotations: editor.getOption("showFoldedAnnotations"),
+                enableKeyboardAccessibility: editor.getOption("enableKeyboardAccessibility"),
+                tooltipFollowsMouse: editor.getOption("tooltipFollowsMouse"),
+            };
+
+            // Save dark or light theme based on system dark mode
+            const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const currentTheme = isDarkMode ? 'darkTheme' : 'lightTheme';
+            currentSettings[currentTheme] = editor.getTheme();
+
+            chrome.storage.sync.set({
+                editorSettings: currentSettings
+            }).then(() => {
+                window.alert('Editor settings saved!')
+            });
+        },
+    });
+    editor.commands.addCommand({
+        name: 'Clear saved editor settings',
+        exec: function () {
+            chrome.storage.sync.remove(["editorSettings"])
+                .then(() => {
+                    window.alert('Editor settings cleared!')
+                });
         },
     });
 
@@ -74,6 +154,7 @@ function initEditor(input, onwrite, onclose, onmaximize) {
         editor.resize();
     });
     resizeObserver.observe(editorEl);
+
 
     // Set editor text value and line number if provided
     if (input) editor.setValue(input.textContent || input.value || input);
