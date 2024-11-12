@@ -11,6 +11,8 @@ Click on the "Edit with Ace" button to open the editor window (or close the exis
 ### Keybindings
 - `Alt/Opt + .` (can be changed in Extensions > Keyboard shortcuts): Open/Close the editor window
 - `Ctrl + s`: Save the changes to SAS Studio editor window
+- `Ctrl + Alt/Opt + s`: Save editor settings  
+    Editor settings can be cleared by running the command `Clear saved editor settings` in Ace command palette (`F1` or `Alt/Cmd + Shift + P`).
 - `Ctrl + Alt/Opt + m`: Toggle maximized editor window or default size
 
 By default, the editor use vim keybinding. It can be changed in the editor settings (`Ctrl/Cmd + ,`).
