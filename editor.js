@@ -47,6 +47,18 @@ async function initEditor(input, onwrite, onclose, onmaximize) {
 
     // Key bindings
     editor.commands.addCommand({
+        name: "openCommandPalette",
+        description: "Open command palette",
+        bindKey: {
+            win: 'Alt-Shift-P',
+            mac: 'Command-Shift-P'
+        },
+        exec: function (editor) {
+            editor.prompt({ $type: "commands" });
+        },
+        readOnly: true
+    });
+    editor.commands.addCommand({
         name: 'Save and quit',
         bindKey: 'Ctrl-S',
         exec: function (editor) {
