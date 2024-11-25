@@ -75,8 +75,12 @@
                 e.preventDefault();
                 currentX = e.clientX - initialX;
                 currentY = e.clientY - initialY;
-                editorContainer.style.left = currentX + "px";
-                editorContainer.style.top = currentY + "px";
+                editorContainer.style.left = Math.min(
+                    Math.max(currentX, 0), window.innerWidth - 30
+                ) + "px";
+                editorContainer.style.top = Math.min(
+                    Math.max(currentY, 0), window.innerHeight - 30
+                ) + "px";
             }
         }
 
