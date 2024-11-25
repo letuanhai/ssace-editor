@@ -21,23 +21,10 @@ function addListenerToMain(extension_id) {
                 ctrl.gotoline(msg.data.lineNumber + 1);
                 break;
             case 'CloseEditorContainer':
-                document.getElementById('ssace-editor-container').remove();
+                document.getElementById('ssace-editor-btn-close').click();
                 break;
             case 'MaximizeRestoreEditorContainer':
-                const editorContainer = document.getElementById('ssace-editor-container');
-                // Resize editor container to cover whole page
-                //  and restore to default size and position if already maximized
-                if (editorContainer.style.width !== '100%') {
-                    editorContainer.style.width = '100%';
-                    editorContainer.style.height = '100%';
-                    editorContainer.style.top = '0';
-                    editorContainer.style.left = '0';
-                } else {
-                    editorContainer.style.width = '';
-                    editorContainer.style.height = '';
-                    editorContainer.style.top = '';
-                    editorContainer.style.left = '';
-                }
+                document.getElementById('ssace-editor-btn-maximize').click();
                 break;
         }
     });
