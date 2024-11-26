@@ -8,6 +8,9 @@
             return;
         }
 
+        const containerMaximizedState = { width: '100%', height: '100%', top: '0px', left: '0px' };
+        const containerDefaultState = {};
+
         // Create container for the editor
         const editorContainer = document.createElement('div');
         editorContainer.id = 'ssace-editor-container';
@@ -86,6 +89,7 @@
 
         function dragEnd() {
             isDragging = false;
+            saveEditorState();
         }
 
         closeBtn.onclick = () => {
@@ -101,24 +105,74 @@
         maximizeBtn.onclick = () => {
             // Resize editor container to cover whole page
             //  and restore to default size and position if already maximized
-            if (editorContainer.style.width !== '100%') {
-                editorContainer.style.width = '100%';
-                editorContainer.style.height = '100%';
-                editorContainer.style.top = '0';
-                editorContainer.style.left = '0';
+            if (!isContainerMaximized()) {
+                setContainerState(containerMaximizedState);
             } else {
-                editorContainer.style.width = '';
-                editorContainer.style.height = '';
-                editorContainer.style.top = '';
-                editorContainer.style.left = '';
+                loadEditorState();
             }
         };
+        headerBar.ondblclick = (e) => {
+            e.preventDefault(); // Prevent text selection
+            // Restore to default size and position
+            setContainerState(containerDefaultState);
+        };
+        const editorContainerObserver = new ResizeObserver(saveEditorState);
+        editorContainerObserver.observe(editorContainer);
+
+        const getContainerState = () => ({
+            width: Math.floor(editorContainer.offsetWidth * 100 / window.innerWidth) + '%',
+            height: Math.floor(editorContainer.offsetHeight * 100 / window.innerHeight) + '%',
+            top: editorContainer.style.top,
+            left: editorContainer.style.left
+
+        });
+        const setContainerState = (state) => {
+            ({
+                width: editorContainer.style.width = '',
+                height: editorContainer.style.height = '',
+                top: editorContainer.style.top = '',
+                left: editorContainer.style.left = '',
+            } = state);
+        };
+        const isContainerMaximized = () =>
+            JSON.stringify(getContainerState()) === JSON.stringify(containerMaximizedState);
+
+        let saveEditorStateTimeout;
+        let saveEditorStateDebounce = 3000;
+        function saveEditorState() {
+            clearTimeout(saveEditorStateTimeout);
+            saveEditorStateTimeout = setTimeout(() => {
+                if (
+                    isContainerMaximized() || // Ignore maximized state
+                    // Ignore closed container state
+                    editorContainer.offsetHeight === 0 || editorContainer.offsetWidth === 0
+                ) return;
+
+                const editorState = getContainerState();
+                chrome.storage.sync.set({
+                    editorState: editorState
+                }).then(() => {
+                    console.debug('Editor state saved!', editorState);
+                });
+            }, saveEditorStateDebounce);
+        }
+
+        function loadEditorState() {
+            chrome.storage.sync.get('editorState', (data) => {
+                const editorState = data.editorState;
+                if (editorState) {
+                    setContainerState(editorState);
+                }
+            });
+        }
+
 
         editorFrame.onload = () => {
             chrome.runtime.sendMessage({
                 action: 'InitEditor',
             });
         };
+        loadEditorState();
     }
 
     createEditorContainer();
