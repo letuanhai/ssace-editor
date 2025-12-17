@@ -21,7 +21,7 @@ chrome.action.onClicked.addListener(async (tab) => {
 
     // Step 2: Load new Ace library from extension
     console.log('[Extension] Step 2: Loading new Ace library from extension...');
-    const libPath = chrome.runtime.getURL('/lib');
+    const libPath = chrome.runtime.getURL('/lib/ace/src-noconflict');
 
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -147,7 +147,7 @@ function loadNewAceLibrary(libPath) {
       const aceScriptEl = document.createElement('script');
       aceScriptEl.src = `${libPath}/ace.js`;
 
-      aceScriptEl.onload = function() {
+      aceScriptEl.onload = function () {
         console.log('[Ace Loader] ace.js loaded successfully');
 
         try {
@@ -162,19 +162,22 @@ function loadNewAceLibrary(libPath) {
           // Load language tools extension (for autocomplete)
           const langToolScriptEl = document.createElement('script');
           langToolScriptEl.src = `${libPath}/ext-language_tools.js`;
+          const promptFsScriptEl = document.createElement('script');
+          promptFsScriptEl.src = `${libPath}/ext-prompt_fs.js`;
 
-          langToolScriptEl.onload = function() {
+          langToolScriptEl.onload = function () {
             console.log('[Ace Loader] ext-language_tools.js loaded successfully');
             console.log('[Ace Loader] ✓ New Ace library loaded completely');
             resolve();
           };
 
-          langToolScriptEl.onerror = function(error) {
+          langToolScriptEl.onerror = function (error) {
             console.error('[Ace Loader] Failed to load ext-language_tools.js:', error);
             reject(new Error('Failed to load ext-language_tools.js'));
           };
 
           document.body.appendChild(langToolScriptEl);
+          document.body.appendChild(promptFsScriptEl);
 
         } catch (error) {
           console.error('[Ace Loader] Error during ace.js onload:', error);
@@ -182,7 +185,7 @@ function loadNewAceLibrary(libPath) {
         }
       };
 
-      aceScriptEl.onerror = function(error) {
+      aceScriptEl.onerror = function (error) {
         console.error('[Ace Loader] Failed to load ace.js:', error);
         reject(new Error('Failed to load ace.js'));
       };
