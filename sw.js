@@ -168,7 +168,12 @@ function loadNewAceLibrary(libPath) {
           langToolScriptEl.onload = function () {
             console.log('[Ace Loader] ext-language_tools.js loaded successfully');
             console.log('[Ace Loader] ✓ New Ace library loaded completely');
-            resolve();
+            document.body.appendChild(promptFsScriptEl);
+            promptFsScriptEl.onload = function () {
+              console.log('[Ace Loader] ext-prompt_fs.js loaded successfully');
+              console.log('[Ace Loader] ✓ New Ace library loaded completely');
+              resolve();
+            };
           };
 
           langToolScriptEl.onerror = function (error) {
@@ -176,8 +181,13 @@ function loadNewAceLibrary(libPath) {
             reject(new Error('Failed to load ext-language_tools.js'));
           };
 
+
+          promptFsScriptEl.onerror = function (error) {
+            console.error('[Ace Loader] Failed to load ext-prompt_fs.js:', error);
+            reject(new Error('Failed to load ext-prompt_fs.js'));
+          };
+
           document.body.appendChild(langToolScriptEl);
-          document.body.appendChild(promptFsScriptEl);
 
         } catch (error) {
           console.error('[Ace Loader] Error during ace.js onload:', error);
