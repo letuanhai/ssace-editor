@@ -1,39 +1,72 @@
 /**
  * Runtime replacement of SAS Studio's custom editor with Ace Editor
  *
- * Usage: Paste this entire script into the browser console and hit Enter
+ * Usage: Loaded automatically by the Chrome extension (or paste into browser console)
  *
- * This MVP:
- * - Creates a minimal Ace Editor adapter
+ * Documentation:
+ * - SAS_EDITOR_API.md - Complete API reference with 60+ methods
+ * - sas-editor.d.ts - TypeScript definitions for IDE support
+ * - EDITOR_USAGE_MAP.md - Map of 20+ files using the editor API across SAS Studio
+ *
+ * This script:
+ * - Creates AceEditorAdapter class implementing full SAS.Editor API
  * - Replaces the SAS.Editor constructor globally
+ * - Patches DMSEditor.prototype.createCodeEditor for new tabs
  * - Replaces all existing editor instances in open tabs
+ * - Maintains compatibility with all editor consumers (DMSEditor, XMLEditor, TaskEditor, etc.)
  */
 
 (function () {
-  'use strict';
+  "use strict";
 
-  console.log('[Ace Replacement] Starting editor replacement...');
+  console.log("[Ace Replacement] Starting editor replacement...");
 
   // Check if Ace is available
-  if (typeof ace === 'undefined') {
-    console.error('[Ace Replacement] ERROR: ace is not defined. The app should have Ace loaded already.');
+  if (typeof ace === "undefined") {
+    console.error(
+      "[Ace Replacement] ERROR: ace is not defined. The app should have Ace loaded already.",
+    );
     return;
   }
 
   // Check if SAS.Editor exists
-  if (typeof SAS === 'undefined' || typeof SAS.Editor === 'undefined') {
-    console.error('[Ace Replacement] ERROR: SAS.Editor not found. Make sure SAS Studio is loaded.');
+  if (typeof SAS === "undefined" || typeof SAS.Editor === "undefined") {
+    console.error(
+      "[Ace Replacement] ERROR: SAS.Editor not found. Make sure SAS Studio is loaded.",
+    );
     return;
   }
 
-  console.log('[Ace Replacement] Found ace and SAS.Editor, proceeding...');
+  console.log("[Ace Replacement] Found ace and SAS.Editor, proceeding...");
 
   /**
-   * AceEditorAdapter - Minimal adapter that wraps Ace Editor to mimic SAS.Editor API
+   * AceEditorAdapter - Wraps Ace Editor to implement the SAS.Editor API
+   *
+   * This class provides a compatibility layer between Ace Editor and SAS Studio's
+   * expected editor interface. It implements all methods from SAS.Editor (defined in
+   * resources/js/sas-commons/controls/CodeEditor.js).
+   *
+   * For complete API documentation, see:
+   * - SAS_EDITOR_API.md - Comprehensive API reference with usage examples
+   * - sas-editor.d.ts - TypeScript type definitions for IDE support
+   *
+   * Key interfaces implemented:
+   * - Content: getText(), setText(), insert(), clear(), getSelectedText()
+   * - Navigation: gotoLine(), focus(), selectAll()
+   * - Clipboard: cut(), copy(), paste(), canPaste()
+   * - Undo/Redo: undo(), redo(), canUndo(), canRedo()
+   * - Events: bind(), unbind() - supports textChanged, selectionChanged, caretMoved
+   * - Settings: fontSize(), lineNumber(), autoComplete(), tabSize(), readOnly(), etc.
+   * - Dialogs: showFindReplaceDialog(), showGoToLineDialog()
+   * - Layout: resize(), resizeOnly()
+   * - Advanced: getContextMenu(), setNextFocusHandler(), getHTML(), etc.
+   * - Internal: ctrl_.insertText(), ctrl_.selection() (for compatibility)
    */
   class AceEditorAdapter {
     constructor(containerId, content, langMode) {
-      console.log(`[Ace Replacement] Creating Ace editor in container: ${containerId}`);
+      console.log(
+        `[Ace Replacement] Creating Ace editor in container: ${containerId}`,
+      );
 
       this.containerId = containerId;
       this.container = document.getElementById(containerId);
@@ -42,24 +75,28 @@
       this._isAceEditorAdapter = true;
 
       if (!this.container) {
-        console.error(`[Ace Replacement] ERROR: Container ${containerId} not found!`);
+        console.error(
+          `[Ace Replacement] ERROR: Container ${containerId} not found!`,
+        );
         throw new Error(`Container ${containerId} not found`);
       }
 
       // Clear existing content (remove old SAS editor DOM)
-      this.container.innerHTML = '';
+      this.container.innerHTML = "";
 
       // Make sure container has dimensions for Ace to render
-      this.container.style.width = '100%';
-      this.container.style.height = '100%';
+      this.container.style.width = "100%";
+      this.container.style.height = "100%";
 
       // Create Ace editor instance
       try {
         // Set default dark and light theme
-        const darkTheme = 'ace/theme/gruvbox';
-        const lightTheme = 'ace/theme/iplastic';
+        const darkTheme = "ace/theme/gruvbox";
+        const lightTheme = "ace/theme/iplastic";
         // Choose theme based on system dark mode
-        const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const isDarkMode =
+          window.matchMedia &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches;
         const editorTheme = isDarkMode ? darkTheme : lightTheme;
         const defaultEditorConfig = {
           mode: "ace/mode/sas",
@@ -82,22 +119,24 @@
 
         this.aceEditor = ace.edit(containerId, defaultEditorConfig);
         // Watch for dark mode change
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
-          const newEditorTheme = event.matches ? darkTheme : lightTheme;
-          this.aceEditor.setTheme(newEditorTheme);
-        });
+        window
+          .matchMedia("(prefers-color-scheme: dark)")
+          .addEventListener("change", (event) => {
+            const newEditorTheme = event.matches ? darkTheme : lightTheme;
+            this.aceEditor.setTheme(newEditorTheme);
+          });
         // Key bindings
         this.aceEditor.commands.addCommand({
           name: "openCommandPalette",
           description: "Open command palette",
           bindKey: {
-            win: 'Alt-Shift-P',
-            mac: 'Command-Shift-P'
+            win: "Alt-Shift-P",
+            mac: "Command-Shift-P",
           },
           exec: function (editor) {
             editor.prompt({ $type: "commands" });
           },
-          readOnly: true
+          readOnly: true,
         });
         // Remove F3 and F4 key bindings to allow SAS Studio to handle them
         // F3 is typically bound to "findNext" in Ace
@@ -113,7 +152,7 @@
         this.eventHandlers = {
           textChanged: [],
           selectionChanged: [],
-          caretMoved: []
+          caretMoved: [],
         };
 
         // Bind Ace events to our event system
@@ -124,14 +163,35 @@
           this.aceEditor.resize();
         }, 10);
 
-        console.log(`[Ace Replacement] Successfully created Ace editor in ${containerId}`);
+        console.log(
+          `[Ace Replacement] Successfully created Ace editor in ${containerId}`,
+        );
       } catch (error) {
-        console.error('[Ace Replacement] ERROR creating Ace editor:', error);
+        console.error("[Ace Replacement] ERROR creating Ace editor:", error);
         throw error;
       }
 
-      // Property that DMSEditor sets (line 4200 in DMSEditor.js)
+      // Property that DMSEditor sets (line 4188 in DMSEditor.js)
       this.log = null;
+
+      // Internal controller object (accessed by DMSEditor:6768 and DMSTask)
+      // This provides compatibility with code that accesses editor.ctrl_ directly
+      this.ctrl_ = {
+        insertText: (text) => {
+          this.aceEditor.insert(text);
+        },
+        selection: (startLine, startCol, endLine, endCol) => {
+          if (endLine === undefined && endCol === undefined) {
+            // Single position - move cursor
+            this.aceEditor.moveCursorTo(startLine, startCol);
+          } else {
+            // Range selection
+            const Range = ace.require("ace/range").Range;
+            const range = new Range(startLine, startCol, endLine, endCol);
+            this.aceEditor.selection.setRange(range);
+          }
+        },
+      };
     }
 
     /**
@@ -139,24 +199,24 @@
      */
     setupAceEventBindings() {
       // Text changed event
-      this.aceEditor.session.on('change', (delta) => {
-        this.triggerEvent('textChanged', { delta });
+      this.aceEditor.session.on("change", (delta) => {
+        this.triggerEvent("textChanged", { delta });
       });
 
       // Selection changed event
-      this.aceEditor.session.selection.on('changeSelection', () => {
-        this.triggerEvent('selectionChanged');
+      this.aceEditor.session.selection.on("changeSelection", () => {
+        this.triggerEvent("selectionChanged");
       });
 
       // Cursor moved event
-      this.aceEditor.session.selection.on('changeCursor', () => {
+      this.aceEditor.session.selection.on("changeCursor", () => {
         const cursor = this.aceEditor.getCursorPosition();
         // DMSEditor.caretMoved expects e.data.line and e.data.column (0-indexed)
-        this.triggerEvent('caretMoved', {
+        this.triggerEvent("caretMoved", {
           data: {
             line: cursor.row,
-            column: cursor.column
-          }
+            column: cursor.column,
+          },
         });
       });
     }
@@ -166,11 +226,14 @@
      */
     triggerEvent(eventName, data) {
       const handlers = this.eventHandlers[eventName] || [];
-      handlers.forEach(callback => {
+      handlers.forEach((callback) => {
         try {
           callback.call(this, data);
         } catch (error) {
-          console.error(`[Ace Replacement] Error in ${eventName} handler:`, error);
+          console.error(
+            `[Ace Replacement] Error in ${eventName} handler:`,
+            error,
+          );
         }
       });
     }
@@ -190,7 +253,7 @@
      * Set all editor content
      */
     setText(content) {
-      this.aceEditor.setValue(content || '', -1);
+      this.aceEditor.setValue(content || "", -1);
     }
 
     /**
@@ -247,9 +310,9 @@
 
     lineNumber(enable) {
       if (enable !== undefined) {
-        this.aceEditor.setOption('showLineNumbers', enable);
+        this.aceEditor.setOption("showLineNumbers", enable);
       }
-      return this.aceEditor.getOption('showLineNumbers');
+      return this.aceEditor.getOption("showLineNumbers");
     }
 
     syntaxHighlighting(enable) {
@@ -259,10 +322,10 @@
 
     autoComplete(enable) {
       if (enable !== undefined) {
-        this.aceEditor.setOption('enableBasicAutocompletion', enable);
-        this.aceEditor.setOption('enableLiveAutocompletion', enable);
+        this.aceEditor.setOption("enableBasicAutocompletion", enable);
+        this.aceEditor.setOption("enableLiveAutocompletion", enable);
       }
-      return this.aceEditor.getOption('enableBasicAutocompletion');
+      return this.aceEditor.getOption("enableBasicAutocompletion");
     }
 
     lineWrapped(enable) {
@@ -293,40 +356,108 @@
       return this.aceEditor.getReadOnly();
     }
 
-    // Additional stub methods that might be called
-    activate() { /* no-op for MVP */ }
-    deactivate() { /* no-op for MVP */ }
-    insert(text) { this.aceEditor.insert(text); }
-    clear() { this.aceEditor.setValue('', -1); }
-    selectAll() { this.aceEditor.selectAll(); }
-    gotoLine(line) { this.aceEditor.gotoLine(line); }
-    getSelectedText() { return this.aceEditor.getSelectedText(); }
-    lineCount() { return this.aceEditor.session.getLength(); }
-    resize(width, height) { this.aceEditor.resize(); }
+    // Additional methods used by DMSEditor and other components
+    activate() {
+      /* no-op - Ace doesn't need activation */
+    }
+    deactivate() {
+      /* no-op - Ace doesn't need deactivation */
+    }
+    insert(text) {
+      this.aceEditor.insert(text);
+    }
+    clear() {
+      this.aceEditor.setValue("", -1);
+    }
+    selectAll() {
+      this.aceEditor.selectAll();
+    }
+    gotoLine(line) {
+      this.aceEditor.gotoLine(line);
+    }
+    getSelectedText() {
+      return this.aceEditor.getSelectedText();
+    }
+    lineCount() {
+      return this.aceEditor.session.getLength();
+    }
+    resize(width, height) {
+      this.aceEditor.resize();
+    }
+
+    // resizeOnly - Extension method used extensively in DMSEditor, TaskEditor, etc.
+    // This is not in the base API but is checked with "if (editor.resizeOnly)"
+    resizeOnly(width, height) {
+      this.aceEditor.resize();
+    }
 
     // Stub methods that return no-op values
-    undo() { this.aceEditor.undo(); }
-    redo() { this.aceEditor.redo(); }
-    canUndo() { return this.aceEditor.session.getUndoManager().hasUndo(); }
-    canRedo() { return this.aceEditor.session.getUndoManager().hasRedo(); }
-    getContextMenu() { return null; }
-    setNextFocusHandler(fn) { /* no-op */ }
-    setPreviousFocusHandler(fn) { /* no-op */ }
-    setLibService(fn) { /* no-op */ }
-    promptText(text) { /* no-op */ }
-    enableHint(enable) { /* no-op */ }
-    regShortcuts(config) { /* no-op */ }
-    showFindReplaceDialog() { this.aceEditor.execCommand('find'); }
-    hideFindReplaceDialog() { /* no-op */ }
-    showGoToLineDialog() { this.aceEditor.execCommand('gotoline'); }
-    hideGoToLineDialog() { /* no-op */ }
-    search(key, config) { this.aceEditor.find(key, config); }
-    replace(key, value, config) { this.aceEditor.replaceAll(value); }
-    cut() { /* no-op - browser handles */ }
-    copy() { /* no-op - browser handles */ }
-    paste() { /* no-op - browser handles */ }
-    canPaste() { return true; }
-    getHTML(option) { return ''; }
+    undo() {
+      this.aceEditor.undo();
+    }
+    redo() {
+      this.aceEditor.redo();
+    }
+    canUndo() {
+      return this.aceEditor.session.getUndoManager().hasUndo();
+    }
+    canRedo() {
+      return this.aceEditor.session.getUndoManager().hasRedo();
+    }
+    getContextMenu() {
+      return null;
+    }
+    setNextFocusHandler(fn) {
+      /* no-op */
+    }
+    setPreviousFocusHandler(fn) {
+      /* no-op */
+    }
+    setLibService(fn) {
+      /* no-op */
+    }
+    promptText(text) {
+      /* no-op */
+    }
+    enableHint(enable) {
+      /* no-op */
+    }
+    regShortcuts(config) {
+      /* no-op */
+    }
+    showFindReplaceDialog() {
+      this.aceEditor.execCommand("find");
+    }
+    hideFindReplaceDialog() {
+      /* no-op */
+    }
+    showGoToLineDialog() {
+      this.aceEditor.execCommand("gotoline");
+    }
+    hideGoToLineDialog() {
+      /* no-op */
+    }
+    search(key, config) {
+      this.aceEditor.find(key, config);
+    }
+    replace(key, value, config) {
+      this.aceEditor.replaceAll(value);
+    }
+    cut() {
+      /* no-op - browser handles */
+    }
+    copy() {
+      /* no-op - browser handles */
+    }
+    paste() {
+      /* no-op - browser handles */
+    }
+    canPaste() {
+      return true;
+    }
+    getHTML(option) {
+      return "";
+    }
   }
 
   // ============================================================================
@@ -334,21 +465,23 @@
   // ============================================================================
 
   const OriginalSASEditor = SAS.Editor;
-  console.log('[Ace Replacement] Stored original SAS.Editor constructor');
+  console.log("[Ace Replacement] Stored original SAS.Editor constructor");
 
   // ============================================================================
   // STEP 2: Replace SAS.Editor constructor globally
   // ============================================================================
 
   SAS.Editor = function (containerId, content, langMode) {
-    console.log('[Ace Replacement] SAS.Editor constructor called, returning AceEditorAdapter');
+    console.log(
+      "[Ace Replacement] SAS.Editor constructor called, returning AceEditorAdapter",
+    );
     return new AceEditorAdapter(containerId, content, langMode);
   };
 
   // Preserve static properties from original constructor
   SAS.Editor.LanguageMode = OriginalSASEditor.LanguageMode;
 
-  console.log('[Ace Replacement] Replaced SAS.Editor constructor');
+  console.log("[Ace Replacement] Replaced SAS.Editor constructor");
 
   // ============================================================================
   // STEP 3: Patch DMSEditor.prototype.createCodeEditor for new tabs
@@ -372,31 +505,43 @@
     if (DMSEditor && DMSEditor.prototype.createCodeEditor) {
       // Check if already patched
       if (DMSEditor.prototype._aceReplacementPatched) {
-        console.log('[Ace Replacement] DMSEditor.createCodeEditor already patched, skipping');
+        console.log(
+          "[Ace Replacement] DMSEditor.createCodeEditor already patched, skipping",
+        );
       } else {
-        console.log('[Ace Replacement] Found DMSEditor class, patching createCodeEditor...');
+        console.log(
+          "[Ace Replacement] Found DMSEditor class, patching createCodeEditor...",
+        );
 
         // Store original method
         const originalCreateCodeEditor = DMSEditor.prototype.createCodeEditor;
 
         // Replace with our version that uses Ace
         DMSEditor.prototype.createCodeEditor = function () {
-          console.log('[Ace Replacement] createCodeEditor called for new tab');
+          console.log("[Ace Replacement] createCodeEditor called for new tab");
 
           // Verify editorDiv exists
           if (!this.editorDiv || !this.editorDiv.id) {
-            console.error('[Ace Replacement] ERROR: editorDiv not found in DMSEditor instance!');
-            console.log('[Ace Replacement] DMSEditor state:', {
+            console.error(
+              "[Ace Replacement] ERROR: editorDiv not found in DMSEditor instance!",
+            );
+            console.log("[Ace Replacement] DMSEditor state:", {
               hasEditorDiv: !!this.editorDiv,
-              editorDivId: this.editorDiv ? this.editorDiv.id : 'N/A'
+              editorDivId: this.editorDiv ? this.editorDiv.id : "N/A",
             });
-            throw new Error('editorDiv not found');
+            throw new Error("editorDiv not found");
           }
 
-          console.log(`[Ace Replacement] Creating editor for container: ${this.editorDiv.id}`);
+          console.log(
+            `[Ace Replacement] Creating editor for container: ${this.editorDiv.id}`,
+          );
 
           // Handle CPK files (from original code line 4179)
-          if (this.fileType == "CPK" && this.editorContent && this.editorContent.length > 0) {
+          if (
+            this.fileType == "CPK" &&
+            this.editorContent &&
+            this.editorContent.length > 0
+          ) {
             this.setPackage(this.editorContent);
           }
 
@@ -408,7 +553,10 @@
               SAS.Editor.LanguageMode.SasCode,
             );
           } catch (error) {
-            console.error('[Ace Replacement] ERROR in createCodeEditor - failed to create AceEditorAdapter:', error);
+            console.error(
+              "[Ace Replacement] ERROR in createCodeEditor - failed to create AceEditorAdapter:",
+              error,
+            );
             throw error;
           }
 
@@ -422,13 +570,17 @@
 
             // Apply preferences
             appDMS.applyOptionsToEditor(this.editor);
-            console.log('[Ace Replacement] Applied options to new editor');
+            console.log("[Ace Replacement] Applied options to new editor");
 
             // Context menu customization (simplified - skip for MVP)
             try {
               const contextMenu = this.editor.getContextMenu();
-              if (contextMenu && contextMenu.removeItems && contextMenu.insertItems) {
-                const lang = require('dojo/_base/lang');
+              if (
+                contextMenu &&
+                contextMenu.removeItems &&
+                contextMenu.insertItems
+              ) {
+                const lang = require("dojo/_base/lang");
                 contextMenu.removeItems(11, 2);
                 contextMenu.removeItems(9, 2);
                 contextMenu.insertItems(9, [
@@ -445,15 +597,24 @@
                 ]);
               }
             } catch (e) {
-              console.warn('[Ace Replacement] Could not customize context menu:', e);
+              console.warn(
+                "[Ace Replacement] Could not customize context menu:",
+                e,
+              );
             }
 
             // Event bindings (from line 4257-4262)
-            const lang = require('dojo/_base/lang');
-            this.editor.bind("textChanged", lang.hitch(this, this.editorChanged));
-            this.editor.bind("selectionChanged", lang.hitch(this, this.selectionChanged));
+            const lang = require("dojo/_base/lang");
+            this.editor.bind(
+              "textChanged",
+              lang.hitch(this, this.editorChanged),
+            );
+            this.editor.bind(
+              "selectionChanged",
+              lang.hitch(this, this.selectionChanged),
+            );
             this.editor.bind("caretMoved", lang.hitch(this, this.caretMoved));
-            console.log('[Ace Replacement] Bound event handlers for new tab');
+            console.log("[Ace Replacement] Bound event handlers for new tab");
 
             // Remaining setup (from line 4264-4272)
             this.setButtonStates();
@@ -462,7 +623,11 @@
             this.setGoToLineConstraints();
 
             // Additional bindings
-            if (this.editor.bind && window.appDMS && window.appDMS.dropFromDesktop) {
+            if (
+              this.editor.bind &&
+              window.appDMS &&
+              window.appDMS.dropFromDesktop
+            ) {
               this.editor.bind("drop", window.appDMS.dropFromDesktop);
             }
             if (this.editor.setLibService && this.getLibList) {
@@ -471,9 +636,14 @@
             this.editor.activate();
             this.setFinalized(true);
 
-            console.log('[Ace Replacement] New tab editor created with Ace successfully');
+            console.log(
+              "[Ace Replacement] New tab editor created with Ace successfully",
+            );
           } catch (error) {
-            console.error('[Ace Replacement] ERROR in createCodeEditor setup:', error);
+            console.error(
+              "[Ace Replacement] ERROR in createCodeEditor setup:",
+              error,
+            );
             throw error;
           }
         };
@@ -481,13 +651,18 @@
         // Mark as patched to avoid double-patching
         DMSEditor.prototype._aceReplacementPatched = true;
 
-        console.log('[Ace Replacement] Successfully patched DMSEditor.prototype.createCodeEditor');
+        console.log(
+          "[Ace Replacement] Successfully patched DMSEditor.prototype.createCodeEditor",
+        );
       }
     } else {
-      console.warn('[Ace Replacement] Could not find DMSEditor class to patch');
+      console.warn("[Ace Replacement] Could not find DMSEditor class to patch");
     }
   } catch (error) {
-    console.error('[Ace Replacement] Error patching DMSEditor.createCodeEditor:', error);
+    console.error(
+      "[Ace Replacement] Error patching DMSEditor.createCodeEditor:",
+      error,
+    );
   }
 
   // ============================================================================
@@ -499,9 +674,11 @@
     const tabs = appDMS.getCurrentPerspectiveSASStudioTabs();
 
     if (!tabs || !tabs.mainTabs) {
-      console.warn('[Ace Replacement] No tabs found to replace');
+      console.warn("[Ace Replacement] No tabs found to replace");
     } else {
-      console.log(`[Ace Replacement] Found ${tabs.mainTabs.length} tabs, replacing editors...`);
+      console.log(
+        `[Ace Replacement] Found ${tabs.mainTabs.length} tabs, replacing editors...`,
+      );
 
       let replacedCount = 0;
 
@@ -515,25 +692,32 @@
 
             // Skip if already replaced with AceEditorAdapter
             if (oldEditor._isAceEditorAdapter) {
-              console.log(`[Ace Replacement] Tab ${index} already using Ace, skipping`);
+              console.log(
+                `[Ace Replacement] Tab ${index} already using Ace, skipping`,
+              );
               return;
             }
 
             // Get current content from old editor
-            let content = '';
+            let content = "";
             try {
               content = oldEditor.getText();
             } catch (e) {
-              console.warn(`[Ace Replacement] Could not get text from old editor in tab ${index}:`, e);
+              console.warn(
+                `[Ace Replacement] Could not get text from old editor in tab ${index}:`,
+                e,
+              );
             }
 
-            console.log(`[Ace Replacement] Replacing editor in tab ${index} (${tabObj.name || 'unnamed'}), container: ${containerId}`);
+            console.log(
+              `[Ace Replacement] Replacing editor in tab ${index} (${tabObj.name || "unnamed"}), container: ${containerId}`,
+            );
 
             // Create new Ace editor adapter
             const newEditor = new AceEditorAdapter(
               containerId,
               content,
-              SAS.Editor.LanguageMode.SasCode
+              SAS.Editor.LanguageMode.SasCode,
             );
 
             // Replace the reference
@@ -543,49 +727,77 @@
             // These were bound to the old editor and need to be re-bound to the new one
             try {
               // Get dojo's lang.hitch utility
-              const lang = require('dojo/_base/lang');
+              const lang = require("dojo/_base/lang");
 
               // Re-bind the three critical events that DMSEditor expects
-              newEditor.bind("textChanged", lang.hitch(dmsEditor, dmsEditor.editorChanged));
-              newEditor.bind("selectionChanged", lang.hitch(dmsEditor, dmsEditor.selectionChanged));
-              newEditor.bind("caretMoved", lang.hitch(dmsEditor, dmsEditor.caretMoved));
+              newEditor.bind(
+                "textChanged",
+                lang.hitch(dmsEditor, dmsEditor.editorChanged),
+              );
+              newEditor.bind(
+                "selectionChanged",
+                lang.hitch(dmsEditor, dmsEditor.selectionChanged),
+              );
+              newEditor.bind(
+                "caretMoved",
+                lang.hitch(dmsEditor, dmsEditor.caretMoved),
+              );
 
-              console.log(`[Ace Replacement] Re-bound event handlers for tab ${index}`);
+              console.log(
+                `[Ace Replacement] Re-bound event handlers for tab ${index}`,
+              );
             } catch (e) {
-              console.error(`[Ace Replacement] Failed to re-bind event handlers for tab ${index}:`, e);
+              console.error(
+                `[Ace Replacement] Failed to re-bind event handlers for tab ${index}:`,
+                e,
+              );
             }
 
             // Re-apply preferences if possible
-            if (typeof appDMS.applyOptionsToEditor === 'function') {
+            if (typeof appDMS.applyOptionsToEditor === "function") {
               try {
                 appDMS.applyOptionsToEditor(newEditor);
               } catch (e) {
-                console.warn(`[Ace Replacement] Could not apply options to new editor in tab ${index}:`, e);
+                console.warn(
+                  `[Ace Replacement] Could not apply options to new editor in tab ${index}:`,
+                  e,
+                );
               }
             }
 
             replacedCount++;
           } catch (error) {
-            console.error(`[Ace Replacement] Error replacing editor in tab ${index}:`, error);
+            console.error(
+              `[Ace Replacement] Error replacing editor in tab ${index}:`,
+              error,
+            );
           }
         }
       });
 
-      console.log(`[Ace Replacement] Successfully replaced ${replacedCount} editor(s)`);
+      console.log(
+        `[Ace Replacement] Successfully replaced ${replacedCount} editor(s)`,
+      );
     }
   } catch (error) {
-    console.error('[Ace Replacement] Error during tab editor replacement:', error);
+    console.error(
+      "[Ace Replacement] Error during tab editor replacement:",
+      error,
+    );
   }
 
   // ============================================================================
   // DONE!
   // ============================================================================
 
-  console.log('[Ace Replacement] ✓ Editor replacement complete!');
-  console.log('[Ace Replacement] ✓ DMSEditor.prototype.createCodeEditor patched');
-  console.log('[Ace Replacement] ✓ New tabs will automatically use Ace Editor');
-  console.log('[Ace Replacement] ✓ Existing tabs have been replaced with Ace Editor');
-  console.log('[Ace Replacement] - Try typing in the editor to test!');
-  console.log('[Ace Replacement] - Open a new code tab to test!');
-
+  console.log("[Ace Replacement] ✓ Editor replacement complete!");
+  console.log(
+    "[Ace Replacement] ✓ DMSEditor.prototype.createCodeEditor patched",
+  );
+  console.log("[Ace Replacement] ✓ New tabs will automatically use Ace Editor");
+  console.log(
+    "[Ace Replacement] ✓ Existing tabs have been replaced with Ace Editor",
+  );
+  console.log("[Ace Replacement] - Try typing in the editor to test!");
+  console.log("[Ace Replacement] - Open a new code tab to test!");
 })();

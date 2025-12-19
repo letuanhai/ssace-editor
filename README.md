@@ -17,18 +17,21 @@ A Chrome extension that replaces SAS Studio's outdated built-in Ace Editor libra
 The extension performs three steps when you click the extension button:
 
 ### Step 1: Backup and Remove Old Ace Library
+
 - Backs up the original Ace library to `window._origAceLib`
 - Removes `window.ace` object
 - Removes Ace-related style elements (`ace_editor.css`, `ace-tm`)
 - Removes all Ace script elements from the page
 
 ### Step 2: Load New Ace Library
+
 - Loads `ace.js` from the extension's `/lib` directory
 - Configures Ace's `basePath` to point to the extension
 - Loads `ext-language_tools.js` for autocomplete functionality
 - Waits for all scripts to fully load
 
 ### Step 3: Replace SAS Studio Editor
+
 - Injects the editor replacement script (`replace-editor.js`)
 - Creates `AceEditorAdapter` class that mimics SAS.Editor API
 - Replaces `SAS.Editor` constructor globally
@@ -39,12 +42,14 @@ The extension performs three steps when you click the extension button:
 ## Installation
 
 ### Prerequisites
+
 - Chrome browser (or Chromium-based browser like Edge, Brave, etc.)
 - SAS Studio access
 
 ### Steps
 
 1. **Download or clone this repository**
+
    ```bash
    cd /home/lth/browser-extensions/SASStudio-3.82/replace-sasstudio-editor
    ```
@@ -77,6 +82,7 @@ The extension performs three steps when you click the extension button:
 ### Keyboard Shortcut
 
 The extension supports a keyboard shortcut:
+
 - **Alt+Period** (Alt+.) - Activate the extension
 
 You can customize this in Chrome's extension settings (chrome://extensions/shortcuts).
@@ -164,9 +170,11 @@ After running the extension:
 
 ## Files in this Extension
 
+### Extension Files
+
 - **manifest.json** - Extension configuration
 - **sw.js** - Background service worker (handles button clicks and orchestrates the 3 steps)
-- **replace-editor.js** - Editor replacement script (step 3)
+- **replace-editor.js** - Editor replacement script (step 3, contains AceEditorAdapter class)
 - **lib/** - Newer Ace Editor library files
   - `ace.js` - Main Ace Editor library
   - `ext-language_tools.js` - Autocomplete extension
@@ -176,6 +184,81 @@ After running the extension:
   - `icon16.png`, `icon48.png`, `icon128.png`
 - **LICENSE** - License file
 - **README.md** - This file
+
+### Documentation Files
+
+- **[SAS_EDITOR_API.md](./SAS_EDITOR_API.md)** - Complete API reference (60+ methods with examples)
+- **[sas-editor.d.ts](./sas-editor.d.ts)** - TypeScript type definitions for IDE support
+- **[EDITOR_USAGE_MAP.md](./EDITOR_USAGE_MAP.md)** - Map of 20+ files using the editor API
+
+## API Documentation
+
+This extension provides comprehensive documentation of the SAS.Editor interface:
+
+### SAS_EDITOR_API.md
+
+Complete reference documentation for the original SAS Studio editor interface, including:
+
+- All public methods with descriptions and examples
+- Event handling system (textChanged, selectionChanged, caretMoved)
+- Settings and configuration options
+- Usage patterns from DMSEditor
+- Implementation checklist for replacement editors
+
+This is essential reading for understanding what the AceEditorAdapter needs to implement.
+
+### sas-editor.d.ts
+
+TypeScript definition file that provides:
+
+- Full type definitions for SAS.Editor class and all its methods
+- Event data structure types
+- Configuration object interfaces
+- IDE autocomplete support when working with the editor API
+
+You can use this file in your IDE (VSCode, WebStorm, etc.) for better autocomplete and type checking when developing editor replacements or working with the SAS Studio editor API.
+
+**To use in your IDE:**
+
+```javascript
+/// <reference path="./sas-editor.d.ts" />
+
+// Now you get autocomplete for editor methods
+const editor = new SAS.Editor(
+  "container",
+  "content",
+  SAS.Editor.LanguageMode.SasCode,
+);
+editor.getText(); // ← IDE shows type: string
+editor.bind("textChanged", (e) => {
+  // ← IDE shows event type
+  console.log(e.type); // ← Autocomplete works here
+});
+```
+
+### EDITOR_USAGE_MAP.md
+
+Comprehensive map of all files in the SAS Studio codebase that use the editor API:
+
+- **20+ files** documented with specific usage patterns
+- File-by-file breakdown showing which methods are used where
+- Line number references for precise location of API calls
+- Internal API usage (`ctrl_.insertText`, `ctrl_.selection`)
+- Language mode usage across different components
+- Editor access patterns (direct, through tabs, through tasks)
+- Quick reference table showing method usage frequency by file
+
+This is invaluable for understanding the full scope of editor integration and ensuring your replacement implementation is compatible with all consumers of the API.
+
+**Key files documented:**
+
+- DMSEditor.js - Main code editor (100+ API calls)
+- XMLEditor.js, TaskEditor.js - Specialized editors
+- SASStudioInteractiveConsole.js, SASStudioCASConsole.js - Console editors
+- MobileEditor.js - Mobile variant
+- DMSTask.js - Uses internal `ctrl_` API
+- AppDMS.js - Applies settings to all editors
+- Plus 13 more files with complete usage details
 
 ## Development
 
