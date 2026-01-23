@@ -163,14 +163,14 @@ function loadNewAceLibrary(libPath) {
           const langToolScriptEl = document.createElement('script');
           langToolScriptEl.src = `${libPath}/ext-language_tools.js`;
           const promptFsScriptEl = document.createElement('script');
-          promptFsScriptEl.src = `${libPath}/ext-prompt_fs.js`;
+          promptFsScriptEl.src = `${libPath}/ext-browse_ss.js`;
 
           langToolScriptEl.onload = function () {
             console.log('[Ace Loader] ext-language_tools.js loaded successfully');
             console.log('[Ace Loader] ✓ New Ace library loaded completely');
             document.body.appendChild(promptFsScriptEl);
             promptFsScriptEl.onload = function () {
-              console.log('[Ace Loader] ext-prompt_fs.js loaded successfully');
+              console.log('[Ace Loader] ext-browse_ss.js loaded successfully');
               console.log('[Ace Loader] ✓ New Ace library loaded completely');
               resolve();
             };
@@ -183,8 +183,8 @@ function loadNewAceLibrary(libPath) {
 
 
           promptFsScriptEl.onerror = function (error) {
-            console.error('[Ace Loader] Failed to load ext-prompt_fs.js:', error);
-            reject(new Error('Failed to load ext-prompt_fs.js'));
+            console.error('[Ace Loader] Failed to load ext-browse_ss.js:', error);
+            reject(new Error('Failed to load ext-browse_ss.js'));
           };
 
           document.body.appendChild(langToolScriptEl);
