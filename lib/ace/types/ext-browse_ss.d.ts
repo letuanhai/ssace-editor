@@ -4,5 +4,6 @@ declare global {
         appDMS: any,
         _browseSsFilesListener: KeyboardEventListener;
         _browseSsLibraryListener: KeyboardEventListener;
+        _browseSsTabsListener: KeyboardEventListener;
     }
 }
