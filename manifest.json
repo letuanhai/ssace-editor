@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Replace SAS Studio Editor",
+  "name": "SS Ext",
   "version": "1.3",
-  "description": "Replace SAS Studio built-in code editor with Ace editor",
+  "description": "Extension for SAS Studio",
   "icons": {
     "16": "assets/icon16.png",
     "48": "assets/icon48.png",
