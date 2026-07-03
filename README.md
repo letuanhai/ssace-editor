@@ -1,6 +1,8 @@
-# SAS Studio Ace Editor Replacement Extension
+# SS Ext
 
-A Chrome extension that replaces SAS Studio's outdated built-in Ace Editor library with a newer version and replaces the custom SAS editor with Ace Editor inline.
+
+A browser extension that adds a few features fix various inconveniences with SAS Studio 3.8.
+Current version mainly replaces SAS Studio's outdated built-in Ace Editor library with a newer version and replaces the custom SAS editor with Ace Editor inline.
 
 ## Features
 
