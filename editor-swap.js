@@ -330,6 +330,7 @@
     newLib: null, // { ace }
     userSnippets: "", // stashed by toggle()/browse() before the ace lib loads
     _userSnippetsParsed: null, // previously-registered parsed snippets, for unregister
+    _textViewers: [], // live { pane, tabHolder, adapter, item, textarea, origSet, origResize, editable, dirty, buttons } entries
     activate,
     deactivate,
     toggle,
@@ -451,6 +452,8 @@
       SAS.Editor = EditorDispatcher;
     }
 
+    installCreateFileViewPatch();
+
     const tabs = appDMS.getCurrentPerspectiveSASStudioTabs();
     let DMSEditor = null;
     if (tabs && tabs.mainTabs) {
@@ -548,6 +551,252 @@
 
     DMSEditor.prototype._aceReplacementPatched = true;
     ssExt.patchesInstalled = true;
+  }
+
+  // -- "View file as text" -> read-only Ace ----------------------------------------
+  // AppDMS.createFileView (AppDMS.js:4248) always builds a read-only SimpleTextarea
+  // for TXT/LOG/etc. viewers. The load/refresh flows navigate to it POSITIONALLY,
+  // not via tabHolder.simpleTextArea:
+  //   - perspectiveFileOpen refresh guard (AppDMS.js:3927-3932):
+  //       pane.getChildren()[1].getChildren()[0].value
+  //   - xhr load handler (AppDMS.js:3979-3985):
+  //       this.getChildren()[1].getChildren()[0].set("value", data)  (falls back
+  //       to this.tabHolder.simpleTextArea.set("value", data) only if that path
+  //       is absent)
+  // A shim that isn't a real widget in the tree breaks both: destroying the
+  // widget leaves getChildren()[0] undefined, so `.value` throws before the busy
+  // dialog is hidden (forever-spinner) and the load's `.set("value", data)`
+  // never happens (empty editor). Fix: keep the real SimpleTextarea alive and in
+  // the widget tree, hide it visually, and mirror its value writes into Ace.
+  function installCreateFileViewPatch() {
+    if (ssExt._createFileViewPatched) return;
+    if (typeof appDMS.createFileView !== "function") return;
+
+    const originalCreateFileView = appDMS.createFileView.bind(appDMS);
+    ssExt.originalCreateFileView = originalCreateFileView;
+
+    appDMS.createFileView = function (item, targetComponent, content, paneId) {
+      const tabHolder = originalCreateFileView(item, targetComponent, content, paneId);
+      if (ssExt.active) {
+        try {
+          convertTextViewerToAce(item, tabHolder);
+        } catch (e) {
+          console.error("[SS Ext] Failed to convert text viewer to Ace:", e);
+        }
+      }
+      return tabHolder;
+    };
+    ssExt._createFileViewPatched = true;
+  }
+
+  function convertTextViewerToAce(item, tabHolder) {
+    const pane = tabHolder.textContainer;
+    const textarea = tabHolder.simpleTextArea;
+    if (textarea && textarea.domNode) textarea.domNode.style.display = "none";
+
+    const divId = `ssf_textviewer_${pane.id}`;
+    const div = document.createElement("div");
+    div.id = divId;
+    div.style.width = "100%";
+    div.style.height = "100%";
+    pane.domNode.appendChild(div);
+
+    const adapter = new AceEditorAdapter(
+      divId,
+      textarea ? textarea.get("value") : "",
+      SAS.Editor.LanguageMode.SasCode,
+    );
+    adapter.readOnly(true);
+
+    const entry = {
+      pane,
+      tabHolder,
+      adapter,
+      item,
+      textarea,
+      origSet: null,
+      origResize: null,
+      editable: false,
+      dirty: false,
+      _suppressDirty: false,
+      buttons: {},
+    };
+
+    // Mirror server writes (load + refresh, both positional and via
+    // tabHolder.simpleTextArea) into Ace without touching the widget's own
+    // value storage - the positional `.value` reads still see the real thing.
+    if (textarea) {
+      const origSet = textarea.set.bind(textarea);
+      entry.origSet = origSet;
+      textarea.set = function (name, val) {
+        const r = origSet(name, val);
+        if (name === "value") {
+          entry._suppressDirty = true;
+          adapter.setText(val == null ? "" : val);
+          entry._suppressDirty = false;
+        }
+        return r;
+      };
+    }
+
+    const origResize = pane.resize;
+    entry.origResize = origResize;
+    pane.resize = function (...args) {
+      const result = origResize.apply(this, args);
+      adapter.resize();
+      return result;
+    };
+
+    adapter.bind("textChanged", () => {
+      if (entry._suppressDirty) return;
+      entry.dirty = true;
+      if (entry.buttons.save) entry.buttons.save.set("disabled", !entry.editable);
+    });
+
+    ssExt._textViewers.push(entry);
+
+    // Leak safety: dijit destroys the ContentPane's dijit children on tab close
+    // but knows nothing about the adapter - own() runs our cleanup alongside it.
+    // Guarded by array membership so a later restoreTextViewers() (deactivate)
+    // doesn't get double-disposed when the pane is eventually closed for real.
+    pane.own({
+      destroy() {
+        const idx = ssExt._textViewers.indexOf(entry);
+        if (idx === -1) return;
+        adapter.dispose();
+        ssExt._textViewers.splice(idx, 1);
+      },
+    });
+
+    // Toolbar buttons - only TXT/LOG viewers get a toolbar (AppDMS.js:4247-4262).
+    // Other file types that fall through to createFileView still get a read-only
+    // Ace viewer with mirrored content, just no Edit/Save toggle.
+    const toolbar = dijit.byId(`${appDMS.currentPerspectiveKey}_${item.id}_texttoolbar`);
+    if (toolbar) {
+      entry.buttons.edit = makeEditToggleButton(entry);
+      toolbar.addChild(entry.buttons.edit);
+      entry.buttons.save = makeSaveButton(entry);
+      toolbar.addChild(entry.buttons.save);
+    }
+  }
+
+  // dijit.form.ToggleButton is loaded as part of the same AMD graph as
+  // dijit.form.Button (Button.js.uncompressed.js lists it as a dependency), and
+  // a plain Button is already instantiated a few lines above this in
+  // createFileView's own toolbar setup - so it's reliably available. Kept the
+  // fallback anyway in case a future SAS Studio build changes that.
+  function makeEditToggleButton(entry) {
+    const { adapter } = entry;
+    if (typeof dijit.form.ToggleButton === "function") {
+      return new dijit.form.ToggleButton({
+        label: "Edit",
+        showLabel: true,
+        checked: false,
+        onChange(checked) {
+          adapter.readOnly(!checked);
+          entry.editable = checked;
+          if (entry.buttons.save) entry.buttons.save.set("disabled", !checked || !entry.dirty);
+        },
+      });
+    }
+    return new dijit.form.Button({
+      label: "Edit",
+      showLabel: true,
+      onClick() {
+        const wasReadOnly = adapter.readOnly();
+        adapter.readOnly(!wasReadOnly);
+        entry.editable = wasReadOnly;
+        this.set("label", wasReadOnly ? "Lock" : "Edit");
+        if (entry.buttons.save) entry.buttons.save.set("disabled", !entry.editable || !entry.dirty);
+      },
+    });
+  }
+
+  function makeSaveButton(entry) {
+    return new dijit.form.Button({
+      iconClass: "sasSaveIcon",
+      label: "Save",
+      showLabel: false,
+      disabled: true,
+      onClick() {
+        saveTextViewer(entry);
+      },
+    });
+  }
+
+  // Minimal mirror of DMSEditor.prototype.saveFile's core POST (DMSEditor.js
+  // ~6791-6976) - just the plain "workspace" save path. No autosave/backup
+  // cleanup (viewers never created a backup file), no MVS/ftp/CTK/CPK branches,
+  // since text viewers only ever come from plain workspace files.
+  function saveTextViewer(entry) {
+    const uri = entry.item && entry.item.uri;
+    if (!uri) {
+      console.error("[SS Ext] Cannot save text viewer: no item.uri", entry.item);
+      if (typeof dojoAlert === "function") dojoAlert("Save failed: no file URI");
+      else alert("Save failed: no file URI");
+      return;
+    }
+
+    let url =
+      appDMS.baseURL +
+      "/sasexec/sessions/" +
+      appDMS.sessionId +
+      "/workspace/" +
+      encodeValue(uri, false, "/", false);
+    const encoding = entry.item.encoding;
+    if (typeof encoding === "string" && encoding) url += "?encoding=" + encoding;
+
+    dojo.xhrPost({
+      postData: entry.adapter.getText(),
+      url,
+      contentType: "text/file",
+      handleAs: "json",
+      headers: { ObjectType: "" },
+      preventCache: true,
+      load: () => {
+        entry.dirty = false;
+        if (entry.buttons.save) entry.buttons.save.set("disabled", true);
+      },
+      error: (err) => {
+        // DMSEditor treats HTTP 499 as a successful save too.
+        if (err && err.status === 499) {
+          entry.dirty = false;
+          if (entry.buttons.save) entry.buttons.save.set("disabled", true);
+          return;
+        }
+        try {
+          dojoAlert(err.response.xhr.getResponseHeader("Exception"));
+        } catch (_) {
+          alert("Save failed");
+        }
+      },
+    });
+  }
+
+  function restoreTextViewers() {
+    // ponytail: viewers opened while INACTIVE were never converted, so they stay
+    // original editors - activation only affects viewers opened afterwards.
+    const entries = ssExt._textViewers.splice(0, ssExt._textViewers.length);
+    entries.forEach((entry) => {
+      const { pane, adapter, textarea, origSet, origResize, buttons } = entry;
+      try {
+        adapter.dispose();
+
+        const div = document.getElementById(`ssf_textviewer_${pane.id}`);
+        if (div) div.remove();
+
+        if (textarea) {
+          if (origSet) textarea.set = origSet;
+          if (textarea.domNode) textarea.domNode.style.display = "";
+        }
+        pane.resize = origResize;
+
+        if (buttons.edit) buttons.edit.destroy();
+        if (buttons.save) buttons.save.destroy();
+      } catch (e) {
+        console.error("[SS Ext] Failed to restore text viewer:", e);
+      }
+    });
   }
 
   // -- Per-tab swap ---------------------------------------------------------------
@@ -665,6 +914,7 @@
     window.ace = ssExt.origLib.ace;
 
     const restored = restoreTabsToOriginal();
+    restoreTextViewers();
     console.log(`[SS Ext] deactivated Ace editor, ${restored} tab(s) restored`);
     return { active: false };
   }
