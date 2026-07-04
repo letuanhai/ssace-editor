@@ -14,13 +14,15 @@
     "storage"
   ],
   "action": {
-    "default_title": "Activate editor"
+    "default_title": "SS Ext",
+    "default_popup": "popup.html"
   },
   "commands": {
-    "_execute_action": {
+    "toggle_editor": {
       "suggested_key": {
         "default": "Alt+Period"
-      }
+      },
+      "description": "Toggle the Ace editor"
     },
     "browse_files": {
       "suggested_key": {
@@ -43,6 +45,13 @@
   },
   "background": {
     "service_worker": "sw.js"
+  },
+  "host_permissions": [
+    "*://*/SASStudio/*"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   },
   "web_accessible_resources": [
     {

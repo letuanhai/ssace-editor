@@ -1,16 +1,21 @@
 # SS Ext
 
 A browser extension that toggles SAS Studio 3.8's built-in editor for a modern Ace
-editor at runtime, with SAS syntax highlighting and snippets.
+editor at runtime (SAS syntax highlighting, configurable snippets), plus ~25
+independent UX fixes for the rest of SAS Studio. No Tampermonkey install needed —
+everything lives in the extension.
 
 ## Features
 
-- Toggle on/off with one click (or Alt+Period) — no page refresh needed either direction
+- Toggle on/off with one click (popup, or Alt+Period) — no page refresh needed either direction
 - Toolbar badge shows `ON` while Ace is active for that tab
-- SAS syntax highlighting (`ace/mode/sas`) and snippets
+- SAS syntax highlighting (`ace/mode/sas`) and snippets, user-configurable from the options page
 - Applies to every open tab and to new tabs opened while active
 - Text, cursor position, and dirty (`*`) state are preserved across a toggle;
   undo history is not (see Known Limitations)
+- ~25 UX fixes/quick actions (tab management, tree navigation, keyboard shortcuts,
+  clipboard, context menus) — quick actions live in the popup, on/off toggles and
+  hotkey rebinding live in the options page
 
 ## Installation
 
@@ -21,8 +26,12 @@ editor at runtime, with SAS syntax highlighting and snippets.
 ## Usage
 
 1. Open SAS Studio and let it fully load
-2. Click the extension icon, or press **Alt+Period**, to toggle Ace on
+2. Click the extension icon to open the popup, then "Toggle Ace editor" (or press
+   **Alt+Period** directly) to toggle Ace on
 3. Click again (or Alt+Period again) to toggle back to the original editor
+4. Use the popup for quick actions (reload file, focus tree, close tab, ...);
+   use the options page (link in the popup, or right-click the icon → Options)
+   to turn UX patches on/off, rebind hotkeys, or edit custom snippets
 
 ## How It Works
 
@@ -49,9 +58,28 @@ Clicking the toolbar button injects `editor-swap.js` into the page's MAIN world
 
 ## Browsing
 
-`window.__ssExt.browse(kind, libPath)` (used for browse_ss prompts) only loads
-the new Ace library if needed — it does not activate the editor replacement,
-so browse prompts work even while the built-in editor is still in use.
+`window.__ssExt.browse(kind, libPath, snippetsText)` (used for browse_ss prompts)
+only loads the new Ace library if needed — it does not activate the editor
+replacement, so browse prompts work even while the built-in editor is still in use.
+
+## UX fixes and configuration
+
+`ss-fixes.js` (injected automatically on every SAS Studio page load) provides
+~25 independent fixes on top of the editor toggle: tab management, tree
+navigation, keyboard shortcuts, clipboard, context menus. Quick actions
+(reload file, close tab, focus tree, ...) are one click away in the popup, each
+with its default hotkey shown alongside. Passive patches (confirm-on-drop,
+middle-click-close, keep-alive, ...) and hotkey bindings are configured from
+the options page (`chrome.runtime.openOptionsPage()`, linked from the popup) —
+patch/hotkey changes apply on the next page reload.
+
+## Snippets
+
+The options page also hosts an Ace-editor-backed snippet editor
+(`chrome.storage.local.snippets.sas`, native Ace snippet format). Saved
+snippets are additive over ace's own built-in SAS snippets and live-apply to
+every open SAS Studio tab immediately (no reload needed) via a
+`chrome.storage.onChanged` listener in `sw.js`.
 
 ## Known Limitations
 
@@ -60,24 +88,34 @@ so browse prompts work even while the built-in editor is still in use.
 - `getHTML()` (used by print/summary views) returns plain escaped text rather
   than syntax-highlighted markup — Ace has no built-in HTML export loaded
 - Some advanced context-menu customization is limited
+- Duplicate snippet triggers (built-in vs. user-defined) both appear in the
+  completion list rather than the user one taking priority
 
 ## Files
 
-- `manifest.json`, `sw.js` — extension config + service worker (toggle + badge)
+- `manifest.json`, `sw.js` — extension config + service worker (editor toggle,
+  ss-fixes injection, live snippet apply)
 - `editor-swap.js` — `AceEditorAdapter`, the `window.__ssExt` singleton, and the
   one-time SAS.Editor/DMSEditor patches
+- `ss-fixes.js` — ~25 UX fixes, split into one-shot `ACTIONS` and passive `PATCHES`
+- `tools-meta.js` — shared `SSF_TOOLS` metadata (labels/titles/hotkeys) for
+  ss-fixes, the popup, and the options page
+- `defaults.js` — shared `DEFAULT_SAS_SNIPPETS` default snippet text
+- `popup.html`/`popup.js` — quick actions + editor toggle
+- `options.html`/`options.js` — patch toggles, hotkey rebinding, snippet editor
 - `lib/ace/src-noconflict/` — the newer Ace library; `ext-browse_ss.js` is custom,
-  everything else is stock Ace (don't hand-edit)
-- `ss-fixes.user.js` — separate Tampermonkey userscript with ~25 unrelated UX fixes
+  everything else is stock Ace (don't hand-edit, including `snippets/sas.js` —
+  custom snippets live in `defaults.js`/storage now)
 - `SAS_EDITOR_API.md`, `sas-editor.d.ts`, `EDITOR_USAGE_MAP.md` — reference docs
   for the `SAS.Editor` API surface `AceEditorAdapter` implements
 
 ## Development
 
-No build step. To test changes: reload the unpacked extension in
-`chrome://extensions/`, refresh the SAS Studio page, and toggle. Logs are
-prefixed `[SS Ext]` — one line per toggle (`activated`/`deactivated ... N
-tab(s) ...`), plus errors and warnings for unexpected states.
+No build step, no Tampermonkey needed. To test changes: reload the unpacked
+extension in `chrome://extensions/`, refresh the SAS Studio page, and toggle
+(popup or Alt+Period). Logs are prefixed `[SS Ext]` — one line per toggle
+(`activated`/`deactivated ... N tab(s) ...`), plus errors and warnings for
+unexpected states.
 
 ## Credits
 

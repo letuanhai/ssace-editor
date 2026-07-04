@@ -1,14 +1,24 @@
 /**
- * Background service worker for the SAS Studio editor toggle.
+ * Background service worker.
  *
- * On toolbar click: inject editor-swap.js (idempotent - no-ops if already present),
- * then call window.__ssExt.toggle(libPath) in the page to flip Ace on/off. The
- * returned { active } state drives the per-tab badge.
+ * Three independent jobs:
  *
- * chrome.commands (Alt+P/O/T) do the same inject step, then call
- * window.__ssExt.browse(kind, libPath) instead, which may trigger a first-time
- * activation (see editor-swap.js's doBrowse()).
+ * 1. Editor toggle (Alt+Period / toggle_editor command, or the popup's toggle
+ *    button): inject editor-swap.js (idempotent - no-ops if already present),
+ *    then call window.__ssExt.toggle(libPath, snippetsText) in the page to flip
+ *    Ace on/off. The returned { active } state drives the per-tab badge.
+ *    browse_files/library/tabs commands do the same inject step, then call
+ *    window.__ssExt.browse(kind, libPath, snippetsText) instead.
+ *
+ * 2. ss-fixes injection: on every SASStudio page load (tabs.onUpdated), inject
+ *    tools-meta.js + ss-fixes.js into the MAIN world and call
+ *    window.__ssf.init(settings) with the persisted patch/hotkey settings.
+ *
+ * 3. Live snippet apply: when chrome.storage.local's `snippets` changes, push
+ *    the new text into every open SASStudio tab via window.__ssExt.applySnippets.
  */
+
+importScripts("defaults.js");
 
 const LIB_PATH = "/lib/ace/src-noconflict";
 
@@ -48,20 +58,11 @@ async function showErrorAlert(tabId, message) {
   }
 }
 
-chrome.action.onClicked.addListener(async (tab) => {
-  try {
-    const libPath = chrome.runtime.getURL(LIB_PATH);
-    const result = await injectAndRun(
-      tab.id,
-      (path) => window.__ssExt.toggle(path),
-      [libPath],
-    );
-    await setBadge(tab.id, result && result.active);
-  } catch (error) {
-    console.error("[SS Ext] Error toggling editor:", error);
-    await showErrorAlert(tab.id, error.message);
-  }
-});
+// Unset storage -> defaults; a saved value wins even when empty (user cleared).
+async function getSnippetsText() {
+  const { snippets } = await chrome.storage.local.get("snippets");
+  return snippets && typeof snippets.sas === "string" ? snippets.sas : DEFAULT_SAS_SNIPPETS;
+}
 
 const BROWSE_COMMANDS = {
   browse_files: "files",
@@ -70,19 +71,84 @@ const BROWSE_COMMANDS = {
 };
 
 chrome.commands.onCommand.addListener(async (command, tab) => {
-  const kind = BROWSE_COMMANDS[command];
-  if (!kind || !tab || tab.id === undefined) return;
+  if (!tab || tab.id === undefined) return;
 
   try {
     const libPath = chrome.runtime.getURL(LIB_PATH);
-    const result = await injectAndRun(
-      tab.id,
-      (browseKind, path) => window.__ssExt.browse(browseKind, path),
-      [kind, libPath],
-    );
+    const snippetsText = await getSnippetsText();
+
+    let result;
+    if (command === "toggle_editor") {
+      result = await injectAndRun(tab.id, (path, snippets) => window.__ssExt.toggle(path, snippets), [libPath, snippetsText]);
+    } else {
+      const kind = BROWSE_COMMANDS[command];
+      if (!kind) return;
+      result = await injectAndRun(tab.id, (browseKind, path, snippets) => window.__ssExt.browse(browseKind, path, snippets), [
+        kind,
+        libPath,
+        snippetsText,
+      ]);
+    }
     await setBadge(tab.id, result && result.active);
   } catch (error) {
-    console.error("[SS Ext] Error browsing:", error);
+    console.error("[SS Ext] Error handling command:", command, error);
     await showErrorAlert(tab.id, error.message);
+  }
+});
+
+// -- ss-fixes injection on every SASStudio page load ---------------------------
+
+const SASSTUDIO_URL_PATTERN = /\/SASStudio\//;
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "complete") return;
+  if (!tab.url || !SASSTUDIO_URL_PATTERN.test(tab.url)) return;
+
+  try {
+    const { fixes, hotkeys } = await chrome.storage.local.get(["fixes", "hotkeys"]);
+    const settings = { fixes: fixes || {}, hotkeys: hotkeys || {} };
+
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["tools-meta.js", "ss-fixes.js"],
+      world: "MAIN",
+    });
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (s) => window.__ssf.init(s),
+      args: [settings],
+      world: "MAIN",
+    });
+  } catch (error) {
+    console.error("[SS Ext] Error injecting ss-fixes:", error);
+  }
+});
+
+// -- Live snippet apply on storage change --------------------------------------
+
+chrome.storage.onChanged.addListener(async (changes, areaName) => {
+  if (areaName !== "local" || !changes.snippets) return;
+
+  const newValue = changes.snippets.newValue;
+  const text = newValue && typeof newValue.sas === "string" ? newValue.sas : DEFAULT_SAS_SNIPPETS;
+
+  try {
+    const tabs = await chrome.tabs.query({ url: "*://*/SASStudio/*" });
+    await Promise.all(
+      tabs.map((tab) =>
+        chrome.scripting
+          .executeScript({
+            target: { tabId: tab.id },
+            func: (snippetsText) => {
+              window.__ssExt && window.__ssExt.applySnippets && window.__ssExt.applySnippets(snippetsText);
+            },
+            args: [text],
+            world: "MAIN",
+          })
+          .catch(() => {}), // no-op if editor-swap.js isn't loaded in that tab
+      ),
+    );
+  } catch (error) {
+    console.error("[SS Ext] Error live-applying snippets:", error);
   }
 });

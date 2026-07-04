@@ -328,11 +328,14 @@
     patchesInstalled: false,
     origLib: null, // { ace }
     newLib: null, // { ace }
+    userSnippets: "", // stashed by toggle()/browse() before the ace lib loads
+    _userSnippetsParsed: null, // previously-registered parsed snippets, for unregister
     activate,
     deactivate,
     toggle,
     loadNewAce,
     browse,
+    applySnippets,
   };
   window.__ssExt = ssExt;
 
@@ -394,6 +397,33 @@
     // ace.js just clobbered window.ace with the new build, so put the global
     // back on whichever side is actually active.
     window.ace = ssExt.active ? ssExt.newLib.ace : ssExt.origLib.ace;
+  }
+
+  // -- User-configurable snippets -------------------------------------------------
+  // Additive over ace's built-in SAS snippets - parseSnippetFile + register don't
+  // replace anything. ponytail: duplicate triggers appear twice in the completion
+  // list; dedupe-by-trigger is the upgrade path if that ever bites someone.
+  function applySnippets(text) {
+    if (!ssExt.newAceLoaded) return; // nothing to apply against yet
+    ssExt.userSnippets = text || "";
+
+    try {
+      ssExt.newLib.ace.require("ace/ext/language_tools"); // ensure snippet manager is wired up
+      const sm = ssExt.newLib.ace.require("ace/snippets").snippetManager;
+
+      if (ssExt._userSnippetsParsed) {
+        sm.unregister(ssExt._userSnippetsParsed, "sas");
+        ssExt._userSnippetsParsed = null;
+      }
+
+      if (text) {
+        const parsed = sm.parseSnippetFile(text);
+        sm.register(parsed, "sas");
+        ssExt._userSnippetsParsed = parsed;
+      }
+    } catch (e) {
+      console.error("[SS Ext] Failed to apply user snippets:", e);
+    }
   }
 
   // -- One-time SAS.Editor / DMSEditor patches -----------------------------------
@@ -616,6 +646,7 @@
     if (ssExt.active) return { active: true };
 
     await loadNewAce(libPath);
+    applySnippets(ssExt.userSnippets);
     // Global still needs to point at the tokenizer's ace.require registry.
     window.ace = ssExt.newLib.ace;
     ssExt.active = true;
@@ -638,7 +669,8 @@
     return { active: false };
   }
 
-  function toggle(libPath) {
+  function toggle(libPath, snippetsText) {
+    if (snippetsText !== undefined) ssExt.userSnippets = snippetsText;
     ssExt._pending = (ssExt._pending || Promise.resolve()).then(
       () => (ssExt.active ? deactivate() : activate(libPath)),
       () => (ssExt.active ? deactivate() : activate(libPath)),
@@ -651,6 +683,7 @@
     // permanently once loaded) - it doesn't need activation of the editor
     // replacement itself. loadNewAce no-ops if already loaded.
     await loadNewAce(libPath);
+    applySnippets(ssExt.userSnippets);
     // Resolve through the NEW ace instance, not window.ace - the global is the
     // original library whenever the toggle is off.
     const browseSsModule = ssExt.newLib && ssExt.newLib.ace.require("ace/ext/browse_ss");
@@ -663,7 +696,8 @@
     return { active: ssExt.active };
   }
 
-  function browse(kind, libPath) {
+  function browse(kind, libPath, snippetsText) {
+    if (snippetsText !== undefined) ssExt.userSnippets = snippetsText;
     // Serialize through the same _pending chain as toggle() so browse can't
     // race a concurrent toggle/activation.
     ssExt._pending = (ssExt._pending || Promise.resolve()).then(

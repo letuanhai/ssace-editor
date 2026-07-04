@@ -76,28 +76,49 @@ dance entirely — settings travel as plain arguments. Requires adding `host_per
 for the SASStudio URL patterns (e.g. `*://*/SASStudio/*`) to the manifest; the script
 keeps its existing `.dijitTreeNode` wait as the readiness gate.
 
-**Popup (`action.default_popup`) with two sections:**
+**Popup (`action.default_popup`) — quick actions only:**
 
-- *Actions*: one button per action, labels + hotkey hints from the shared metadata.
+- One button per action, labels + hotkey hints from the shared metadata.
   Click → `chrome.scripting.executeScript({ world: 'MAIN', func: n => window.__ssf.run(n),
   args: [name] })` — opening the popup grants `activeTab`, so no extra permission.
   Popup closing on click is fine for one-shot commands.
-- *Hotkeys*: stay as in-page capture-phase listeners (not `chrome.commands` — its key
-  set can't express Alt+{ / Alt+[ / Alt+| and it can't preempt page handlers), but
-  become reconfigurable: per-action keymap overrides stored in `chrome.storage.local`,
-  merged over the defaults from the tool metadata, delivered through the same
-  `init(settings)`. Popup offers a per-action "change hotkey" recorder; applies on next
-  reload like everything else. Only `_execute_action` (Alt+Period) remains a browser-level
-  command.
+- The editor replace/restore toggle (Phase 1) lives here too as a button + state
+  indicator, plus a link to the options page. Nothing else — all configuration moves
+  to the options page.
+
+**Options page (`options.html`) — all configuration:**
+
 - *Passive patches*: a checkbox per patch, persisted to `chrome.storage.local`
   (default: all on). Applied by `init(settings)` at page load — **no live-unpatching**;
-  changes take effect on next page reload. Popup says so in one line.
-- The editor replace/restore toggle (Phase 1) moves here too as a button + state
-  indicator, making the popup the single control surface; a later "auto-activate Ace"
-  checkbox slots in naturally.
+  changes take effect on next page reload. Page says so in one line.
+- *Hotkeys*: stay as in-page capture-phase listeners (not `chrome.commands` — its key
+  set can't express Alt+{ / Alt+[ / Alt+| and it can't preempt page handlers), but
+  become reconfigurable: a hotkey table with a per-action "record next keypress"
+  control; overrides stored in `chrome.storage.local`, merged over the defaults from
+  the tool metadata, delivered through the same `init(settings)`; applies on next
+  reload. Only `_execute_action` (Alt+Period) and the three browse_ss commands remain
+  browser-level `chrome.commands`.
+- A later "auto-activate Ace on page load" checkbox slots in here naturally.
+
+**Configurable Ace snippets (options page):**
+
+- Storage gains `snippets: { sas: "<ace snippet file text>" }` — native Ace snippet
+  format (`snippet trigger` / tab-indented body), no invented schema.
+- The options page hosts the snippet editor: an Ace editor loaded from `lib/` with
+  `ace/mode/snippets` highlighting and a Save-to-storage button.
+- Apply path: `editor-swap.js` `loadNewAce()` gains `applySnippets(text)` — after
+  ext-language_tools loads, `snippetManager.parseSnippetFile(text)` +
+  `register(parsed, 'sas')`. Additive over the built-in set; ponytail ceiling:
+  duplicate triggers appear twice, dedupe-by-trigger is the upgrade path.
+- Live-apply on storage change (unregister old, register new) — snippets are the one
+  setting where this is nearly free and iteration speed matters; everything else stays
+  apply-on-reload.
+- Migration: the hand-edited custom snippets in `lib/ace/src-noconflict/snippets/sas.js`
+  move into the options page's default snippet text; the vendored file returns to stock
+  so ace upgrades stay drop-in.
 
 Per-feature behavior is untouched; this phase relocates the menu and adds the on/off
-switches, nothing more.
+switches and snippet config, nothing more.
 
 ## Phase 4 — SAS language server integration (optional, last)
 
