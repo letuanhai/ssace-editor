@@ -6,6 +6,34 @@
     <style>
       :root {
         color-scheme: light dark;
+        --bg: #1e1e1e;
+        --fg: #ddd;
+        --fg-muted: #999;
+        --fg-mono: #ccc;
+        --border: #3a3a3a;
+        --border-soft: #2c2c2c;
+        --btn-bg: #2d2d2d;
+        --btn-border: #555;
+        --btn-hover: #3a3a3a;
+        --recording-bg: #6b3a3a;
+        --recording-border: #a55;
+        --ok: #6bcf6b;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #fff;
+          --fg: #222;
+          --fg-muted: #666;
+          --fg-mono: #333;
+          --border: #ccc;
+          --border-soft: #e2e2e2;
+          --btn-bg: #f5f5f5;
+          --btn-border: #bbb;
+          --btn-hover: #e8e8e8;
+          --recording-bg: #f3c9c9;
+          --recording-border: #c66;
+          --ok: #2a7f2a;
+        }
       }
       body {
         margin: 0 auto;
@@ -13,8 +41,8 @@
         padding: 16px 20px 60px;
         font-family: system-ui, sans-serif;
         font-size: 14px;
-        background: #1e1e1e;
-        color: #ddd;
+        background: var(--bg);
+        color: var(--fg);
       }
       h1 {
         font-size: 20px;
@@ -22,11 +50,11 @@
       h2 {
         font-size: 15px;
         margin-top: 32px;
-        border-bottom: 1px solid #3a3a3a;
+        border-bottom: 1px solid var(--border);
         padding-bottom: 6px;
       }
       .note {
-        color: #999;
+        color: var(--fg-muted);
         font-size: 12px;
         margin: 4px 0 12px;
       }
@@ -38,7 +66,7 @@
       th {
         text-align: left;
         padding: 4px 6px;
-        border-bottom: 1px solid #2c2c2c;
+        border-bottom: 1px solid var(--border-soft);
       }
       label {
         display: flex;
@@ -48,34 +76,34 @@
       }
       button {
         padding: 4px 10px;
-        border: 1px solid #555;
+        border: 1px solid var(--btn-border);
         border-radius: 4px;
-        background: #2d2d2d;
-        color: #ddd;
+        background: var(--btn-bg);
+        color: var(--fg);
         cursor: pointer;
       }
       button:hover {
-        background: #3a3a3a;
+        background: var(--btn-hover);
       }
       button.recording {
-        background: #6b3a3a;
-        border-color: #a55;
+        background: var(--recording-bg);
+        border-color: var(--recording-border);
       }
       .hotkey-value {
         font-family: monospace;
-        color: #ccc;
+        color: var(--fg-mono);
       }
       #snippets-editor {
         width: 100%;
         height: 360px;
-        border: 1px solid #444;
+        border: 1px solid var(--btn-border);
       }
       #save-snippets {
         margin-top: 8px;
       }
       #save-status {
         margin-left: 10px;
-        color: #6bcf6b;
+        color: var(--ok);
         font-size: 12px;
       }
     </style>
@@ -113,7 +141,8 @@
     <script src="defaults.js"></script>
     <script src="lib/ace/src-noconflict/ace.js"></script>
     <script src="lib/ace/src-noconflict/mode-snippets.js"></script>
-    <script src="lib/ace/src-noconflict/theme-textmate.js"></script>
+    <script src="lib/ace/src-noconflict/theme-gruvbox.js"></script>
+    <script src="lib/ace/src-noconflict/theme-iplastic.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

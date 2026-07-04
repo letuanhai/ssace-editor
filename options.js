@@ -120,7 +120,12 @@
   async function initSnippets() {
     const editor = ace.edit("snippets-editor");
     editor.session.setMode("ace/mode/snippets");
-    editor.setTheme("ace/theme/textmate");
+
+    // Follow OS dark/light, matching the main editor's theme pair (editor-swap.js).
+    const darkMql = window.matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = () => editor.setTheme(darkMql.matches ? "ace/theme/gruvbox" : "ace/theme/iplastic");
+    darkMql.addEventListener("change", applyTheme);
+    applyTheme();
 
     const { snippets } = await chrome.storage.local.get("snippets");
     // Unset -> defaults; a saved value wins even when empty (user cleared).

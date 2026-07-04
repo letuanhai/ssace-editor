@@ -6,21 +6,45 @@
     <style>
       :root {
         color-scheme: light dark;
+        --bg: #1e1e1e;
+        --fg: #ddd;
+        --border: #3a3a3a;
+        --btn-bg: #2d2d2d;
+        --btn-border: #555;
+        --hover: #3a3a3a;
+        --row-hover: #2d2d2d;
+        --hint: #888;
+        --on: #6bcf6b;
+        --link: #6bb6ff;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #fff;
+          --fg: #222;
+          --border: #ccc;
+          --btn-bg: #f5f5f5;
+          --btn-border: #bbb;
+          --hover: #e8e8e8;
+          --row-hover: #f0f0f0;
+          --hint: #777;
+          --on: #2a7f2a;
+          --link: #0b62c4;
+        }
       }
       body {
         margin: 0;
         width: 300px;
         font-family: system-ui, sans-serif;
         font-size: 13px;
-        background: #1e1e1e;
-        color: #ddd;
+        background: var(--bg);
+        color: var(--fg);
       }
       header {
         padding: 10px 12px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        border-bottom: 1px solid #3a3a3a;
+        border-bottom: 1px solid var(--border);
       }
       header h1 {
         font-size: 13px;
@@ -32,20 +56,20 @@
         align-items: center;
         gap: 8px;
         padding: 10px 12px;
-        border-bottom: 1px solid #3a3a3a;
+        border-bottom: 1px solid var(--border);
       }
       #toggle-btn {
         flex: 1;
         padding: 8px;
-        border: 1px solid #555;
+        border: 1px solid var(--btn-border);
         border-radius: 4px;
-        background: #2d2d2d;
-        color: #ddd;
+        background: var(--btn-bg);
+        color: var(--fg);
         cursor: pointer;
         font-size: 13px;
       }
       #toggle-btn:hover {
-        background: #3a3a3a;
+        background: var(--hover);
       }
       #toggle-state {
         font-weight: 600;
@@ -53,7 +77,7 @@
         text-align: center;
       }
       #toggle-state.on {
-        color: #6bcf6b;
+        color: var(--on);
       }
       #actions {
         max-height: 320px;
@@ -69,28 +93,28 @@
         padding: 6px 12px;
         border: none;
         background: transparent;
-        color: #ddd;
+        color: var(--fg);
         text-align: left;
         cursor: pointer;
         font-size: 13px;
       }
       .action-btn:hover {
-        background: #2d2d2d;
+        background: var(--row-hover);
       }
       .hotkey-hint {
-        color: #888;
+        color: var(--hint);
         font-size: 11px;
         margin-left: 8px;
         white-space: nowrap;
       }
       footer {
         padding: 8px 12px;
-        border-top: 1px solid #3a3a3a;
+        border-top: 1px solid var(--border);
       }
       #options-link {
         background: none;
         border: none;
-        color: #6bb6ff;
+        color: var(--link);
         cursor: pointer;
         font-size: 13px;
         padding: 0;
