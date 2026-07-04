@@ -833,19 +833,39 @@ Add a prefix to the path for different option:
         currentTab.editor.focus();
       },
     },
-    toggleNativeContextMenu: {
-      // Live toggle, no reload: SAS Studio binds its dijit context menus on
-      // individual nodes, so a window-capture contextmenu listener that stops
-      // propagation starves them all and lets the browser's native menu show.
+    toggleNativeMouse: {
+      // Live "native mouse handling" toggle, no reload. When ON, a window-capture
+      // handler stops PROPAGATION (never preventDefault) of the mouse-gesture
+      // events, so no SAS Studio/dojo handler can hijack them: context menus stay
+      // native, no dojo drag anywhere (trees, tabs, dialogs, splitters), and
+      // nothing can preventDefault the mousedown that starts native text
+      // selection. A CSS override lifts dojo's user-select:none. Clicks still
+      // work - `click` events are synthesized from down+up regardless of
+      // propagation - but drag-dependent and mousedown-dependent widgets
+      // (including the Ace editor's mouse handling) are degraded until toggled
+      // OFF; this is a temporary select-and-copy mode.
       fn: function () {
-        if (window.__ssfNativeCtxMenu) {
-          window.removeEventListener("contextmenu", window.__ssfNativeCtxMenu, true);
-          window.__ssfNativeCtxMenu = null;
-          showNotification({ message: "Context menu: SAS Studio" });
+        if (window.__ssfNativeMouse) {
+          const { handler, events } = window.__ssfNativeMouse;
+          events.forEach((ev) => window.removeEventListener(ev, handler, true));
+          window.__ssfNativeMouse = null;
+          document.getElementById("ssf-native-mode-css")?.remove();
+          showNotification({ message: "Native mouse handling OFF: SAS Studio drag & context menus restored" });
         } else {
-          window.__ssfNativeCtxMenu = (e) => e.stopImmediatePropagation();
-          window.addEventListener("contextmenu", window.__ssfNativeCtxMenu, true);
-          showNotification({ message: "Context menu: native browser" });
+          const handler = (e) => e.stopImmediatePropagation();
+          const events = ["contextmenu", "mousedown", "mousemove", "selectstart", "dragstart"];
+          events.forEach((ev) => window.addEventListener(ev, handler, true));
+          const css = document.createElement("style");
+          css.id = "ssf-native-mode-css";
+          css.textContent = `body, body * {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+          }`;
+          document.head.appendChild(css);
+          window.__ssfNativeMouse = { handler, events };
+          showNotification({
+            message: "Native mouse handling ON: browser context menu and text selection everywhere, all SAS Studio drag disabled",
+          });
         }
       },
     },

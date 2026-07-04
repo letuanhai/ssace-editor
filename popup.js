@@ -62,8 +62,8 @@
         tab.id,
         ["tools-meta.js", "ss-fixes.js"],
         () => {
-          window.__ssf.run("toggleNativeContextMenu");
-          return typeof window.__ssfNativeCtxMenu === "function";
+          window.__ssf.run("toggleNativeMouse");
+          return Boolean(window.__ssfNativeMouse);
         },
         [],
       );
@@ -146,7 +146,7 @@
         target: { tabId: tab.id },
         func: () => ({
           ace: Boolean(window.__ssExt && window.__ssExt.active),
-          nativeCtxMenu: typeof window.__ssfNativeCtxMenu === "function",
+          nativeCtxMenu: Boolean(window.__ssfNativeMouse),
         }),
         world: "MAIN",
       });

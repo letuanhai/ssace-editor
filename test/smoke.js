@@ -77,15 +77,36 @@ function check(name, ok, detail) {
     check("reopenClosedTab restores tab", afterReopen === state.tabCount, { afterReopen });
   }
 
-  // -- native context menu toggle (live) -----------------------------------------
-  const ctxMenu = await page.evaluate(() => {
-    window.__ssf.run("toggleNativeContextMenu");
-    const on = typeof window.__ssfNativeCtxMenu === "function";
-    window.__ssf.run("toggleNativeContextMenu");
-    const off = window.__ssfNativeCtxMenu === null;
+  // -- native mouse handling toggle (live) ----------------------------------------
+  const nativeMode = await page.evaluate(() => {
+    window.__ssf.run("toggleNativeMouse");
+    // with the blocker ON, a mousedown dispatched at a tree label must never
+    // reach a document-level listener (all page handlers are starved)
+    let reachedDoc = false;
+    const docProbe = () => (reachedDoc = true);
+    document.addEventListener("mousedown", docProbe, true);
+    const label = document.querySelector(".dijitTreeLabel");
+    label.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    document.removeEventListener("mousedown", docProbe, true);
+    const on = {
+      state: Boolean(window.__ssfNativeMouse),
+      css: !!document.getElementById("ssf-native-mode-css"),
+      selectable: getComputedStyle(label).userSelect === "text",
+      gestureBlocked: !reachedDoc,
+    };
+    window.__ssf.run("toggleNativeMouse");
+    label.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    const off = {
+      state: !window.__ssfNativeMouse,
+      css: !document.getElementById("ssf-native-mode-css"),
+    };
     return { on, off };
   });
-  check("native context menu toggles on and back off", ctxMenu.on && ctxMenu.off, ctxMenu);
+  check(
+    "native mouse mode blocks page gesture handlers and enables selection css",
+    Object.values(nativeMode.on).every(Boolean) && Object.values(nativeMode.off).every(Boolean),
+    nativeMode,
+  );
 
   await ctx.close();
   console.log(failures ? `\n${failures} check(s) FAILED` : "\nAll checks passed");
