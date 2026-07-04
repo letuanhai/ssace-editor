@@ -41,4 +41,4 @@ Everything below lives in one extension (`manifest.json`, `sw.js`, `editor-swap.
 
 ## Development
 
-No build, no Tampermonkey needed anymore. To test changes: `chrome://extensions/` → reload the unpacked extension → refresh the SAS Studio page → toggle (Alt+Period) or use the popup. All extension logs are prefixed `[SS Ext]`; expect one line per toggle (`activated`/`deactivated ... N tab(s) ...`) plus errors/warnings only.
+No build, no Tampermonkey needed anymore. Smoke test: `node test/smoke.js` — launches headless Chromium with the unpacked extension against the live instance and exercises injection, middle-click close (raw CDP input — catches event-suppression bugs synthetic dispatch can't), reopen, and the context-menu toggle; see the file header for `SS_URL`/`CHROME_BIN` env vars and the playwright requirement. To test changes manually: `chrome://extensions/` → reload the unpacked extension → refresh the SAS Studio page → toggle (Alt+Period) or use the popup. All extension logs are prefixed `[SS Ext]`; expect one line per toggle (`activated`/`deactivated ... N tab(s) ...`) plus errors/warnings only.

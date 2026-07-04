@@ -51,14 +51,14 @@
         margin: 0;
         font-weight: 600;
       }
-      #toggle-row {
+      .toggle-row {
         display: flex;
         align-items: center;
         gap: 8px;
         padding: 10px 12px;
         border-bottom: 1px solid var(--border);
       }
-      #toggle-btn {
+      .toggle-btn {
         flex: 1;
         padding: 8px;
         border: 1px solid var(--btn-border);
@@ -68,15 +68,15 @@
         cursor: pointer;
         font-size: 13px;
       }
-      #toggle-btn:hover {
+      .toggle-btn:hover {
         background: var(--hover);
       }
-      #toggle-state {
+      .toggle-state {
         font-weight: 600;
         min-width: 28px;
         text-align: center;
       }
-      #toggle-state.on {
+      .toggle-state.on {
         color: var(--on);
       }
       #actions {
@@ -125,9 +125,15 @@
     <header>
       <h1>SS Ext</h1>
     </header>
-    <div id="toggle-row">
-      <button id="toggle-btn">Toggle Ace editor</button>
-      <span id="toggle-state">...</span>
+    <div class="toggle-row">
+      <button id="toggle-btn" class="toggle-btn">Toggle Ace editor</button>
+      <span id="toggle-state" class="toggle-state">...</span>
+    </div>
+    <div class="toggle-row">
+      <button id="ctxmenu-btn" class="toggle-btn" title="Switch between the browser's native right-click menu and SAS Studio's own context menus (applies immediately)">
+        Toggle native context menu
+      </button>
+      <span id="ctxmenu-state" class="toggle-state">...</span>
     </div>
     <div id="actions"></div>
     <footer>

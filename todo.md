@@ -1,0 +1,2 @@
+- [ ] open all non-table file types as text in the Ace editor, instead of SAS Studio's per-type viewers/import tools
+- [ ] 

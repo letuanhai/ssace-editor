@@ -48,6 +48,31 @@
     el.classList.toggle("on", Boolean(active));
   }
 
+  function setCtxMenuState(nativeOn) {
+    const el = document.getElementById("ctxmenu-state");
+    el.textContent = nativeOn ? "ON" : "OFF";
+    el.classList.toggle("on", Boolean(nativeOn));
+  }
+
+  async function handleCtxMenuClick() {
+    const tab = await getActiveTab();
+    if (!tab || tab.id === undefined) return;
+    try {
+      const nativeOn = await injectAndRun(
+        tab.id,
+        ["tools-meta.js", "ss-fixes.js"],
+        () => {
+          window.__ssf.run("toggleNativeContextMenu");
+          return typeof window.__ssfNativeCtxMenu === "function";
+        },
+        [],
+      );
+      setCtxMenuState(nativeOn);
+    } catch (e) {
+      console.error("[SS Ext] popup context-menu toggle failed:", e);
+    }
+  }
+
   async function handleToggleClick() {
     const tab = await getActiveTab();
     if (!tab || tab.id === undefined) return;
@@ -107,6 +132,7 @@
   }
 
   document.getElementById("toggle-btn").addEventListener("click", handleToggleClick);
+  document.getElementById("ctxmenu-btn").addEventListener("click", handleCtxMenuClick);
   document.getElementById("options-link").addEventListener("click", () => chrome.runtime.openOptionsPage());
 
   getHotkeySettings().then(renderActions);
@@ -118,12 +144,18 @@
       if (!tab || tab.id === undefined) return;
       const [{ result }] = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: () => Boolean(window.__ssExt && window.__ssExt.active),
+        func: () => ({
+          ace: Boolean(window.__ssExt && window.__ssExt.active),
+          nativeCtxMenu: typeof window.__ssfNativeCtxMenu === "function",
+        }),
         world: "MAIN",
       });
-      setToggleState(result);
+      setToggleState(result && result.ace);
+      setCtxMenuState(result && result.nativeCtxMenu);
     } catch {
-      setToggleState(false); // not a SAS Studio tab / nothing injected yet
+      // not a SAS Studio tab / nothing injected yet
+      setToggleState(false);
+      setCtxMenuState(false);
     }
   })();
 })();

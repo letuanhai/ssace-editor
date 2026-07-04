@@ -833,6 +833,22 @@ Add a prefix to the path for different option:
         currentTab.editor.focus();
       },
     },
+    toggleNativeContextMenu: {
+      // Live toggle, no reload: SAS Studio binds its dijit context menus on
+      // individual nodes, so a window-capture contextmenu listener that stops
+      // propagation starves them all and lets the browser's native menu show.
+      fn: function () {
+        if (window.__ssfNativeCtxMenu) {
+          window.removeEventListener("contextmenu", window.__ssfNativeCtxMenu, true);
+          window.__ssfNativeCtxMenu = null;
+          showNotification({ message: "Context menu: SAS Studio" });
+        } else {
+          window.__ssfNativeCtxMenu = (e) => e.stopImmediatePropagation();
+          window.addEventListener("contextmenu", window.__ssfNativeCtxMenu, true);
+          showNotification({ message: "Context menu: native browser" });
+        }
+      },
+    },
   };
 
   // ==========================================================================
@@ -875,8 +891,17 @@ Add a prefix to the path for different option:
       const tabs = window.appDMS.tabs;
 
       function addCloseTabListener(t) {
-        (t.tab ?? t).controlButton.domNode.addEventListener(
-          "mouseup",
+        // Some tab shapes have no controlButton (unclosable/system tabs) - skip
+        // them instead of letting one bad tab abort the whole patch.
+        const btn = t && (t.tab ?? t).controlButton;
+        if (!btn || !btn.domNode) return;
+        // auxclick, not mouseup: on touch-capable devices dojo/touch.js's dojoClick
+        // machinery swallows native middle-button mouseup at document level
+        // (stopNativeEvents) and re-emits a synthetic mouseup with button=0.
+        // auxclick is outside its suppression list and is the proper event for
+        // non-primary-button clicks anyway.
+        btn.domNode.addEventListener(
+          "auxclick",
           (e) => {
             if (e.button === 1) {
               e.stopImmediatePropagation();
