@@ -29,19 +29,29 @@ editor at runtime, with SAS syntax highlighting and snippets.
 Clicking the toolbar button injects `editor-swap.js` into the page's MAIN world
 (a no-op if it's already there) and calls `window.__ssExt.toggle(libPath)`:
 
-- **First activation** loads the newer Ace library from `lib/ace/src-noconflict/`
-  (`ace.js`, `ext-language_tools.js`, `ext-browse_ss.js`), backing up the app's
-  original bundled Ace (and its `ace_editor.css`/`ace-tm` style elements) by
-  reference so it can be swapped back in later.
-- **Activating** swaps `window.ace` and those style elements to the new library,
-  installs one-time dispatcher patches on `SAS.Editor` and
+- **First load** fetches the newer Ace library from `lib/ace/src-noconflict/`
+  (`ace.js`, `ext-language_tools.js`, `ext-browse_ss.js`) and backs up a
+  reference to the app's original bundled Ace so `window.ace` can be swapped
+  back later. The new library's CSS stays attached permanently once loaded —
+  SAS Studio renders its own editor DOM and never references any Ace CSS
+  class, so neither build's stylesheet actually matters. This load can happen
+  without activating anything (see Browsing, below).
+- **Activating** swaps the `window.ace` global to the new library (it's still
+  needed as the registry runtime `ace.require(...)` calls resolve tokenization
+  against), installs one-time dispatcher patches on `SAS.Editor` and
   `DMSEditor.prototype.createCodeEditor` (so both existing and future tabs route
   to the right editor based on current state), then converts every open tab's
   editor to an `AceEditorAdapter`, re-binding `textChanged`/`selectionChanged`/
   `caretMoved`.
-- **Deactivating** swaps `window.ace`/styles back, captures each Ace tab's text,
+- **Deactivating** swaps `window.ace` back, captures each Ace tab's text,
   cursor, and dirty state, destroys the Ace instance, and recreates the original
   editor via the (now-dispatched) `createCodeEditor`, restoring what it captured.
+
+## Browsing
+
+`window.__ssExt.browse(kind, libPath)` (used for browse_ss prompts) only loads
+the new Ace library if needed — it does not activate the editor replacement,
+so browse prompts work even while the built-in editor is still in use.
 
 ## Known Limitations
 

@@ -326,28 +326,34 @@
     active: false,
     newAceLoaded: false,
     patchesInstalled: false,
-    origLib: null, // { ace, styleEls }
-    newLib: null, // { ace, styleEls }
+    origLib: null, // { ace }
+    newLib: null, // { ace }
     activate,
     deactivate,
     toggle,
     loadNewAce,
+    browse,
   };
   window.__ssExt = ssExt;
 
   // -- Ace library management ---------------------------------------------------
-  // Both ace builds always register style elements #ace_editor.css and #ace-tm
-  // as soon as ace.js finishes evaluating (each build's bundle unconditionally
-  // requires ./theme/textmate). Same ids in both versions, so element references
-  // are captured once and swapped by reference - never re-queried by id later.
+  // The original ace build's #ace_editor.css/#ace-tm style elements are inert:
+  // SAS Studio renders its own editor DOM (EditorView.js) and never references
+  // any .ace_* class or calls ace.edit - the vendored ace is only ever used via
+  // runtime ace.require(...) for tokenization (Mode.js/SyntaxColorerAdapter.js).
+  // So those old style elements are just discarded here (avoids duplicate-rule
+  // edge cases once the new build's same-named styles are attached). The
+  // window.ace GLOBAL still has to be swapped between builds though, whenever
+  // the toggle is inactive - it's the registry those ace.require calls resolve
+  // against, and it needs to keep pointing at the version-matched library.
 
   function backupOrigAce() {
     if (ssExt.origLib) return;
-    const styleEls = ["ace_editor.css", "ace-tm"]
+    ["ace_editor.css", "ace-tm"]
       .map((id) => document.getElementById(id))
-      .filter(Boolean);
-    styleEls.forEach((el) => el.remove());
-    ssExt.origLib = { ace: window.ace, styleEls };
+      .filter(Boolean)
+      .forEach((el) => el.remove());
+    ssExt.origLib = { ace: window.ace };
     delete window.ace;
     Array.from(document.head.querySelectorAll("script[src]"))
       .filter((el) => /\/ace\/.*\.js$/.test(el.src))
@@ -375,26 +381,19 @@
     // Note: the src-noconflict build only ever assigns window.ace - its internal
     // require/define are closure-local, so window.require/window.define (Dojo's
     // AMD loader) are never touched and don't need swapping either direction.
-    const styleEls = ["ace_editor.css", "ace-tm"]
-      .map((id) => document.getElementById(id))
-      .filter(Boolean);
-    styleEls.forEach((el) => el.remove());
+    // Its #ace_editor.css/#ace-tm style elements stay attached permanently from
+    // here on - they're harmless since nothing in SAS Studio references .ace_*.
 
     await loadScript(`${libPath}/ext-language_tools.js`);
     await loadScript(`${libPath}/ext-browse_ss.js`);
 
-    ssExt.newLib = { ace: window.ace, styleEls };
+    ssExt.newLib = { ace: window.ace };
     ssExt.newAceLoaded = true;
-  }
 
-  function swapGlobals(toNew) {
-    const target = toNew ? ssExt.newLib : ssExt.origLib;
-    const other = toNew ? ssExt.origLib : ssExt.newLib;
-    window.ace = target.ace;
-    if (other) other.styleEls.forEach((el) => el.remove());
-    target.styleEls.forEach((el) => {
-      if (!el.isConnected) document.head.appendChild(el);
-    });
+    // loadNewAce can run while the toggle is inactive (browse-before-activate);
+    // ace.js just clobbered window.ace with the new build, so put the global
+    // back on whichever side is actually active.
+    window.ace = ssExt.active ? ssExt.newLib.ace : ssExt.origLib.ace;
   }
 
   // -- One-time SAS.Editor / DMSEditor patches -----------------------------------
@@ -616,10 +615,9 @@
   async function activate(libPath) {
     if (ssExt.active) return { active: true };
 
-    if (!ssExt.newAceLoaded) {
-      await loadNewAce(libPath);
-    }
-    swapGlobals(true);
+    await loadNewAce(libPath);
+    // Global still needs to point at the tokenizer's ace.require registry.
+    window.ace = ssExt.newLib.ace;
     ssExt.active = true;
     installPatches();
 
@@ -632,7 +630,8 @@
     if (!ssExt.active) return { active: false };
 
     ssExt.active = false;
-    swapGlobals(false);
+    // Global still needs to point at the tokenizer's ace.require registry.
+    window.ace = ssExt.origLib.ace;
 
     const restored = restoreTabsToOriginal();
     console.log(`[SS Ext] deactivated Ace editor, ${restored} tab(s) restored`);
@@ -643,6 +642,33 @@
     ssExt._pending = (ssExt._pending || Promise.resolve()).then(
       () => (ssExt.active ? deactivate() : activate(libPath)),
       () => (ssExt.active ? deactivate() : activate(libPath)),
+    );
+    return ssExt._pending;
+  }
+
+  async function doBrowse(kind, libPath) {
+    // browse only needs the new ace lib loaded (its css stays attached
+    // permanently once loaded) - it doesn't need activation of the editor
+    // replacement itself. loadNewAce no-ops if already loaded.
+    await loadNewAce(libPath);
+    // Resolve through the NEW ace instance, not window.ace - the global is the
+    // original library whenever the toggle is off.
+    const browseSsModule = ssExt.newLib && ssExt.newLib.ace.require("ace/ext/browse_ss");
+    const method = browseSsModule && browseSsModule.browse_ss && browseSsModule.browse_ss["browse_" + kind];
+    if (typeof method !== "function") {
+      console.error(`[SS Ext] browse_ss.browse_${kind} not found`);
+      return { active: ssExt.active };
+    }
+    method();
+    return { active: ssExt.active };
+  }
+
+  function browse(kind, libPath) {
+    // Serialize through the same _pending chain as toggle() so browse can't
+    // race a concurrent toggle/activation.
+    ssExt._pending = (ssExt._pending || Promise.resolve()).then(
+      () => doBrowse(kind, libPath),
+      () => doBrowse(kind, libPath),
     );
     return ssExt._pending;
   }
