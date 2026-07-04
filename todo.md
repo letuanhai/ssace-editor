@@ -1,2 +1,2 @@
 - [x] replace the "View file as text" text viewer with a read-only Ace editor (default read-only like the original viewer) plus a toolbar button next to "Refresh the content" that toggles the read-only state
-- [ ] allow saving ace configuration: default dark and light theme, font size,...
+- [ ] allow saving ace configuration: default dark and light theme, font size,..., vim mode commands?

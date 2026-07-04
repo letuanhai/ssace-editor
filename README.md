@@ -16,10 +16,11 @@ everything lives in the extension.
 - ~25 UX fixes/quick actions (tab management, tree navigation, keyboard shortcuts,
   clipboard, context menus) — quick actions live in the popup, on/off toggles and
   hotkey rebinding live in the options page
-- While Ace is active, "View file as text" opens in a read-only Ace editor that
+- While Ace is active, "View file as text" opens in an editable Ace editor that
   mirrors the underlying (hidden) SimpleTextarea so SAS Studio's own load/refresh
-  code keeps working; an Edit toggle and a Save button appear next to Refresh —
-  Save POSTs the edited text to the workspace endpoint
+  code keeps working. Editing marks the tab dirty (`*` in the title, like the code
+  editor); save with the Save button next to Refresh, `Ctrl/Cmd+S`, or vim `:w` —
+  Save POSTs to the workspace endpoint. Vim `:q`/`:wq`/`:x` close (and save) the tab
 
 ## Installation
 

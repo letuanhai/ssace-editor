@@ -381,6 +381,11 @@
     await loadScript(`${libPath}/ace.js`);
     if (window.ace && window.ace.config) {
       window.ace.config.set("basePath", libPath);
+      // This build resolves "ace/keyboard/vim" to keyboard-vim.js, but the bundled
+      // file is keybinding-vim.js - without this override vim mode (and its :w/:q
+      // ex-commands) 404s and silently never loads. The adapter requests vim as its
+      // keyboardHandler, so fix the URL before any editor is created.
+      window.ace.config.setModuleUrl("ace/keyboard/vim", `${libPath}/keybinding-vim.js`);
     }
     // Note: the src-noconflict build only ever assigns window.ace - its internal
     // require/define are closure-local, so window.require/window.define (Dojo's
@@ -393,6 +398,9 @@
 
     ssExt.newLib = { ace: window.ace };
     ssExt.newAceLoaded = true;
+
+    // Register vim :w/:q/:wq/:x once the new ace (and its vim module) is available.
+    installVimExCommands();
 
     // loadNewAce can run while the toggle is inactive (browse-before-activate);
     // ace.js just clobbered window.ace with the new build, so put the global
@@ -606,7 +614,9 @@
       textarea ? textarea.get("value") : "",
       SAS.Editor.LanguageMode.SasCode,
     );
-    adapter.readOnly(true);
+    // Always editable (like a normal editor); the dirty state drives the tab
+    // marker and Save button, and Ctrl/Cmd+S / vim :w save.
+    adapter.readOnly(false);
 
     const entry = {
       pane,
@@ -616,9 +626,9 @@
       textarea,
       origSet: null,
       origResize: null,
-      editable: false,
       dirty: false,
       _suppressDirty: false,
+      baseLabel: null, // captured lazily from the tab control button on first dirty
       buttons: {},
     };
 
@@ -649,8 +659,15 @@
 
     adapter.bind("textChanged", () => {
       if (entry._suppressDirty) return;
-      entry.dirty = true;
-      if (entry.buttons.save) entry.buttons.save.set("disabled", !entry.editable);
+      setViewerDirty(entry, true);
+    });
+
+    // Ctrl/Cmd+S saves, same as the code editor. An Ace command intercepts and
+    // preventDefaults the browser's own save dialog.
+    adapter.aceEditor.commands.addCommand({
+      name: "ssfSaveTextViewer",
+      bindKey: { win: "Ctrl-S", mac: "Command-S" },
+      exec: () => saveTextViewer(entry),
     });
 
     ssExt._textViewers.push(entry);
@@ -668,48 +685,38 @@
       },
     });
 
-    // Toolbar buttons - only TXT/LOG viewers get a toolbar (AppDMS.js:4247-4262).
-    // Other file types that fall through to createFileView still get a read-only
-    // Ace viewer with mirrored content, just no Edit/Save toggle.
+    // Toolbar Save button - only TXT/LOG viewers get a toolbar (AppDMS.js:4247-4262).
+    // Other file types that fall through to createFileView still get an editable
+    // Ace viewer with mirrored content (Ctrl+S / vim :w still save), just no button.
     const toolbar = dijit.byId(`${appDMS.currentPerspectiveKey}_${item.id}_texttoolbar`);
     if (toolbar) {
-      entry.buttons.edit = makeEditToggleButton(entry);
-      toolbar.addChild(entry.buttons.edit);
       entry.buttons.save = makeSaveButton(entry);
       toolbar.addChild(entry.buttons.save);
     }
   }
 
-  // dijit.form.ToggleButton is loaded as part of the same AMD graph as
-  // dijit.form.Button (Button.js.uncompressed.js lists it as a dependency), and
-  // a plain Button is already instantiated a few lines above this in
-  // createFileView's own toolbar setup - so it's reliably available. Kept the
-  // fallback anyway in case a future SAS Studio build changes that.
-  function makeEditToggleButton(entry) {
-    const { adapter } = entry;
-    if (typeof dijit.form.ToggleButton === "function") {
-      return new dijit.form.ToggleButton({
-        label: "Edit",
-        showLabel: true,
-        checked: false,
-        onChange(checked) {
-          adapter.readOnly(!checked);
-          entry.editable = checked;
-          if (entry.buttons.save) entry.buttons.save.set("disabled", !checked || !entry.dirty);
-        },
-      });
+  // Tab control button widget for a viewer, resolved via its tabHolder (the tab
+  // object's .tab.tabHolder is the same object we hold in the entry).
+  function viewerTabControlButton(entry) {
+    const tabObj = appDMS.tabs
+      .getAllTabObjects()
+      .find((t) => t.tab && t.tab.tabHolder === entry.tabHolder);
+    return tabObj && tabObj.tab && tabObj.tab.controlButton;
+  }
+
+  // Reflect dirty state into the Save button and the tab title marker, matching
+  // the code editor's "*name" convention (DMSEditor.applyChangedIndicationToTab).
+  function setViewerDirty(entry, dirty) {
+    entry.dirty = dirty;
+    if (entry.buttons.save) entry.buttons.save.set("disabled", !dirty);
+    const btn = viewerTabControlButton(entry);
+    if (btn && btn.containerNode) {
+      if (entry.baseLabel == null) {
+        entry.baseLabel = btn.containerNode.textContent.replace(/^\*/, "");
+      }
+      const label = (dirty ? "*" : "") + entry.baseLabel;
+      btn.containerNode.innerHTML = appDMS.encodeHtml ? appDMS.encodeHtml(label) : label;
     }
-    return new dijit.form.Button({
-      label: "Edit",
-      showLabel: true,
-      onClick() {
-        const wasReadOnly = adapter.readOnly();
-        adapter.readOnly(!wasReadOnly);
-        entry.editable = wasReadOnly;
-        this.set("label", wasReadOnly ? "Lock" : "Edit");
-        if (entry.buttons.save) entry.buttons.save.set("disabled", !entry.editable || !entry.dirty);
-      },
-    });
   }
 
   function makeSaveButton(entry) {
@@ -754,14 +761,12 @@
       headers: { ObjectType: "" },
       preventCache: true,
       load: () => {
-        entry.dirty = false;
-        if (entry.buttons.save) entry.buttons.save.set("disabled", true);
+        setViewerDirty(entry, false);
       },
       error: (err) => {
         // DMSEditor treats HTTP 499 as a successful save too.
         if (err && err.status === 499) {
-          entry.dirty = false;
-          if (entry.buttons.save) entry.buttons.save.set("disabled", true);
+          setViewerDirty(entry, false);
           return;
         }
         try {
@@ -773,6 +778,57 @@
     });
   }
 
+  // -- Vim :w / :q / :wq / :x ------------------------------------------------------
+  // Registered once on the shared vim module (ace/keyboard/vim), so they apply to
+  // every vim-mode Ace instance - text viewers and the code editors alike. The Ex
+  // handler gets `cm.ace` (the acting Ace editor); resolve it back to either a text
+  // viewer entry or a DMSEditor code tab and save/close accordingly.
+  function resolveAceContext(aceEditor) {
+    const viewer = ssExt._textViewers.find((e) => e.adapter && e.adapter.aceEditor === aceEditor);
+    if (viewer) return { type: "viewer", entry: viewer };
+    const tabObj = appDMS.tabs
+      .getAllTabObjects()
+      .find((t) => t.editor && t.editor.editor && t.editor.editor.aceEditor === aceEditor);
+    if (tabObj) return { type: "code", tabObj };
+    return null;
+  }
+
+  function vimSave(ctx) {
+    if (!ctx) return;
+    if (ctx.type === "viewer") saveTextViewer(ctx.entry);
+    else if (ctx.tabObj.editor.saveFile) ctx.tabObj.editor.saveFile();
+  }
+
+  function vimClose(ctx) {
+    if (!ctx) return;
+    const tabObj =
+      ctx.type === "viewer"
+        ? appDMS.tabs.getAllTabObjects().find((t) => t.tab && t.tab.tabHolder === ctx.entry.tabHolder)
+        : ctx.tabObj;
+    if (tabObj) appDMS.tabs.closeTab(tabObj);
+  }
+
+  function installVimExCommands() {
+    if (ssExt._vimExInstalled) return;
+    ssExt._vimExInstalled = true; // guard now so concurrent loads don't double-register
+    ssExt.newLib.ace.config.loadModule("ace/keyboard/vim", (vim) => {
+      const Vim = vim && vim.Vim;
+      if (!Vim || !Vim.defineEx) {
+        ssExt._vimExInstalled = false;
+        return;
+      }
+      const saveAndClose = (cm) => {
+        const ctx = resolveAceContext(cm.ace);
+        vimSave(ctx);
+        vimClose(ctx);
+      };
+      Vim.defineEx("write", "w", (cm) => vimSave(resolveAceContext(cm.ace)));
+      Vim.defineEx("quit", "q", (cm) => vimClose(resolveAceContext(cm.ace)));
+      Vim.defineEx("wq", "wq", saveAndClose);
+      Vim.defineEx("xit", "x", saveAndClose);
+    });
+  }
+
   function restoreTextViewers() {
     // ponytail: viewers opened while INACTIVE were never converted, so they stay
     // original editors - activation only affects viewers opened afterwards.
@@ -780,6 +836,16 @@
     entries.forEach((entry) => {
       const { pane, adapter, textarea, origSet, origResize, buttons } = entry;
       try {
+        // Clear the dirty "*" marker from the tab title before we let go.
+        if (entry.dirty && entry.baseLabel != null) {
+          const btn = viewerTabControlButton(entry);
+          if (btn && btn.containerNode) {
+            btn.containerNode.innerHTML = appDMS.encodeHtml
+              ? appDMS.encodeHtml(entry.baseLabel)
+              : entry.baseLabel;
+          }
+        }
+
         adapter.dispose();
 
         const div = document.getElementById(`ssf_textviewer_${pane.id}`);
@@ -791,7 +857,6 @@
         }
         pane.resize = origResize;
 
-        if (buttons.edit) buttons.edit.destroy();
         if (buttons.save) buttons.save.destroy();
       } catch (e) {
         console.error("[SS Ext] Failed to restore text viewer:", e);

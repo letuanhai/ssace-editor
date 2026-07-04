@@ -208,27 +208,27 @@ function check(name, ok, detail) {
       const isRealWidget = !!(tabHolder.simpleTextArea && tabHolder.simpleTextArea.declaredClass);
       tabHolder.simpleTextArea.set("value", "SMOKE");
       const mirrorRoundtrip = entry.adapter.getText() === "SMOKE";
-      const readOnlyInitially = entry.adapter.readOnly() === true;
+      // Server/refresh writes must NOT mark the viewer dirty.
+      const cleanAfterServerWrite = entry.dirty === false;
+      // Always editable now (no Edit button).
+      const editableByDefault = entry.adapter.readOnly() === false;
+      const noEditButton = !entry.buttons.edit;
 
-      // entry.buttons.edit is the widget the patch itself added to the toolbar -
-      // a real DOM click exercises dijit's own ondijitclick wiring (onChange
-      // for ToggleButton / onClick for the Button fallback) same as a user click.
-      // dijit's _handleOnChange defers onChange by one tick (this.defer(...)),
-      // so wait a beat before reading the adapter back.
-      const editBtn = entry.buttons.edit;
       const saveBtn = entry.buttons.save;
       const saveDisabledInitially = !!(saveBtn && saveBtn.get("disabled"));
-      if (editBtn) (editBtn.focusNode || editBtn.domNode).click();
-      await new Promise((r) => setTimeout(r, 100));
-      const readOnlyAfterToggle = entry.adapter.readOnly() === false;
 
       // Trigger a real edit (setText() doesn't reliably fire textChanged) and
-      // check dirty tracking + Save enabling - do NOT click Save, so the real
-      // file on the server is never touched by this test.
+      // check dirty tracking, Save enabling, and the tab "*" marker - do NOT
+      // click Save, so the real file on the server is never touched.
       entry.adapter.aceEditor.insert("x");
       await new Promise((r) => setTimeout(r, 100));
       const dirtyAfterEdit = entry.dirty === true;
       const saveEnabledAfterEdit = !!(saveBtn && !saveBtn.get("disabled"));
+      const tabLabel = newest.tab.controlButton && newest.tab.controlButton.containerNode.textContent;
+      const tabMarkedDirty = typeof tabLabel === "string" && tabLabel.indexOf("*") === 0;
+
+      // Ctrl+S command is registered on the adapter.
+      const hasSaveCommand = !!entry.adapter.aceEditor.commands.commands.ssfSaveTextViewer;
 
       return {
         found: true,
@@ -237,13 +237,28 @@ function check(name, ok, detail) {
         positionalGuardOk,
         isRealWidget,
         mirrorRoundtrip,
-        readOnlyInitially,
-        readOnlyAfterToggle,
+        cleanAfterServerWrite,
+        editableByDefault,
+        noEditButton,
         saveDisabledInitially,
         dirtyAfterEdit,
         saveEnabledAfterEdit,
+        tabMarkedDirty,
+        hasSaveCommand,
         newTabId: newest.tab.id,
       };
+    });
+
+    // vim :w/:q/:wq/:x install is async (config.loadModule); poll for the module
+    // to load and our install flag to flip, without re-registering (that would
+    // clobber the real handlers).
+    const exOk = await page.evaluate(async () => {
+      for (let i = 0; i < 30; i++) {
+        const mod = window.__ssExt.newLib.ace.require("ace/keyboard/vim");
+        if (mod && mod.Vim && typeof mod.Vim.defineEx === "function" && window.__ssExt._vimExInstalled) return true;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      return false;
     });
 
     check("text viewer converted to Ace (registry entry found)", viewer.found, viewer);
@@ -257,11 +272,14 @@ function check(name, ok, detail) {
       );
       check("tabHolder.simpleTextArea is the real dijit widget, not a shim", viewer.isRealWidget, viewer);
       check("simpleTextArea value writes mirror into the adapter", viewer.mirrorRoundtrip, viewer);
-      check("text viewer starts read-only", viewer.readOnlyInitially, viewer);
-      check("toolbar toggle flips read-only off", viewer.readOnlyAfterToggle, viewer);
+      check("server/refresh writes do not mark dirty", viewer.cleanAfterServerWrite, viewer);
+      check("text viewer is editable by default (no Edit button)", viewer.editableByDefault && viewer.noEditButton, viewer);
       check("save button starts disabled", viewer.saveDisabledInitially, viewer);
       check("editing marks the entry dirty", viewer.dirtyAfterEdit, viewer);
       check("save button enables after a real edit", viewer.saveEnabledAfterEdit, viewer);
+      check("tab title shows dirty marker after edit", viewer.tabMarkedDirty, viewer);
+      check("Ctrl/Cmd+S save command registered on adapter", viewer.hasSaveCommand, viewer);
+      check("vim :w/:q/:wq/:x ex-commands registered", exOk, { exOk });
 
       await page.evaluate((tabId) => window.appDMS.tabs.closeTab(dijit.byId(tabId)), viewer.newTabId);
       await page.waitForTimeout(1500);
