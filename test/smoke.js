@@ -281,6 +281,39 @@ function check(name, ok, detail) {
       check("Ctrl/Cmd+S save command registered on adapter", viewer.hasSaveCommand, viewer);
       check("vim :w/:q/:wq/:x ex-commands registered", exOk, { exOk });
 
+      // focus-code-editor + reload-file actions on the focused text-viewer tab.
+      const focusResult = await page.evaluate(async () => {
+        const tabs = window.appDMS.tabs.getAllTabObjects();
+        const newest = tabs[tabs.length - 1];
+        window.appDMS.tabs.selectTab(newest);
+        const entry = window.__ssExt._textViewers.find((e) => e.tabHolder === newest.tab.tabHolder);
+        window.__ssf.run("focusCodeEditor");
+        await new Promise((r) => setTimeout(r, 200));
+        return { focused: entry.adapter.aceEditor.isFocused(), dirtyBeforeReload: entry.dirty };
+      });
+      check("focus-code-editor focuses the text viewer's Ace adapter", focusResult.focused, focusResult);
+
+      // Reload (same path as the Refresh button) must clear the dirty state.
+      await page.evaluate(() => window.__ssf.run("reloadCurrentFile"));
+      await page.waitForTimeout(3500);
+      const afterReload = await page.evaluate(() => {
+        const tabs = window.appDMS.tabs.getAllTabObjects();
+        const newest = tabs[tabs.length - 1];
+        const entry = window.__ssExt._textViewers.find((e) => e.tabHolder === newest.tab.tabHolder);
+        if (!entry) return { gone: true };
+        const label = newest.tab.controlButton && newest.tab.controlButton.containerNode.textContent;
+        return {
+          dirty: entry.dirty,
+          saveDisabled: !!(entry.buttons.save && entry.buttons.save.get("disabled")),
+          markerCleared: !(typeof label === "string" && label.indexOf("*") === 0),
+        };
+      });
+      check(
+        "reload clears text viewer dirty marker and disables save",
+        !afterReload.dirty && afterReload.saveDisabled && afterReload.markerCleared,
+        afterReload,
+      );
+
       await page.evaluate((tabId) => window.appDMS.tabs.closeTab(dijit.byId(tabId)), viewer.newTabId);
       await page.waitForTimeout(1500);
       const afterClose = await page.evaluate(() => window.__ssExt._textViewers.length);

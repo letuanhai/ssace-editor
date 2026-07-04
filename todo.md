@@ -1,2 +1,3 @@
 - [x] replace the "View file as text" text viewer with a read-only Ace editor (default read-only like the original viewer) plus a toolbar button next to "Refresh the content" that toggles the read-only state
-- [ ] allow saving ace configuration: default dark and light theme, font size,..., vim mode commands?
+- [ ] show ace command palette without any ace editor opened and focused (similar to `browse_ss`), move the extension actions from popup into the command palette. the command palette should be a singleton, and if any ace editor (code/text) is focused then the editor specific command should be shown and apply to that editor, if no editor is focused then do not show those commands
+- [ ] allow saving ace configuration: default dark and light theme, font size,..., and configure vim mode commands (if possible)

@@ -115,8 +115,27 @@
   }
 
   // Reload content of the currently focused file in SAS Studio
+  // The Ace text-viewer entry (from editor-swap.js's __ssExt._textViewers) for a
+  // tab, or null. Lets tab-scoped actions treat a "View as text" tab like an editor.
+  function getTextViewerForTab(tab) {
+    const viewers = window.__ssExt && window.__ssExt._textViewers;
+    const tabHolder = tab && tab.tab && tab.tab.tabHolder;
+    if (!viewers || !tabHolder) return null;
+    return viewers.find((e) => e.tabHolder === tabHolder) || null;
+  }
+
   function reloadCurrentFile() {
     const currentTab = window.appDMS.tabs.getFocusedTab();
+
+    // Text viewer tab: re-fetch from the server exactly as its Refresh button does
+    // (onTextRefresh with the file item the button was wired with). The mirror
+    // clears the dirty state when the fresh content lands.
+    const viewer = getTextViewerForTab(currentTab);
+    if (viewer) {
+      window.appDMS.onTextRefresh(viewer.item);
+      return;
+    }
+
     const currentTabEditor = currentTab.editor;
     const tabContainer = currentTab.tab;
 
@@ -208,6 +227,9 @@
                     this.eatChangeEvent = true;
                     this.editor.setText(data);
                   }
+                  // Reloaded content is the clean baseline: drop the dirty marker
+                  // and disable Save.
+                  this.resetSaveState && this.resetSaveState();
                 }),
                 primary: false,
               },
@@ -231,6 +253,9 @@
             this.eatChangeEvent = true;
             this.editor.setText(data);
           }
+          // Reloaded content is the clean baseline: drop the dirty marker and
+          // disable Save.
+          this.resetSaveState && this.resetSaveState();
         }
       }),
       error: dojo.hitch(currentTabEditor, function (error, ioargs) {
@@ -827,7 +852,14 @@ Add a prefix to the path for different option:
     selectPreviousPane: { fn: () => selectNextPane(-1) },
     focusCodeEditor: {
       fn: function () {
-        const currentTab = window.appDMS.tabs.getFocusedTab()?.editor;
+        const tab = window.appDMS.tabs.getFocusedTab();
+        // Text viewer tab: focus its Ace overlay directly.
+        const viewer = getTextViewerForTab(tab);
+        if (viewer) {
+          viewer.adapter.focus();
+          return;
+        }
+        const currentTab = tab?.editor;
         if (!currentTab) return;
         currentTab.editContentPane.getParent().selectChild(currentTab.editContentPane);
         currentTab.editor.focus();

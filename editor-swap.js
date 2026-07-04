@@ -644,6 +644,9 @@
           entry._suppressDirty = true;
           adapter.setText(val == null ? "" : val);
           entry._suppressDirty = false;
+          // A full server write (initial load or Refresh) is the clean baseline:
+          // clear any prior dirty state, drop the tab marker, disable Save.
+          setViewerDirty(entry, false);
         }
         return r;
       };
