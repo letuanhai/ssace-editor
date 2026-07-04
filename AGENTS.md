@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Chromium extension (Manifest V3) plus a standalone userscript that enhance SAS Studio 3.8 (a legacy Dojo 1.x web app). The extension's main feature is replacing SAS Studio's built-in editor with a modern Ace editor at runtime, via monkey-patching in the page's MAIN world. Everything works by reverse-engineered runtime patching — there is no build step, bundler, or test suite.
+A Chromium extension (Manifest V3) plus a standalone userscript that enhance SAS Studio 3.8 (a legacy Dojo 1.x web app). The extension's main feature is toggling SAS Studio's built-in editor for a modern Ace editor at runtime, via monkey-patching in the page's MAIN world. Everything works by reverse-engineered runtime patching — there is no build step, bundler, or test suite.
 
 A live SAS Studio instance for testing runs at `http://192.168.1.72/SASStudio/38/`.
 
@@ -12,11 +12,11 @@ A live SAS Studio instance for testing runs at `http://192.168.1.72/SASStudio/38
 
 Two independent delivery mechanisms, both patching the same app:
 
-1. **Extension** (root: `manifest.json`, `sw.js`, `replace-editor.js`, `lib/`)
-   - `sw.js` — service worker; on toolbar click (or Alt+Period) runs three steps in the tab's MAIN world: (1) back up the app's bundled old Ace to `window._origAceLib` and remove it, (2) inject the newer Ace from `lib/ace/src-noconflict/` (plus `ext-language_tools.js` and the custom `ext-browse_ss.js`), (3) inject `replace-editor.js`.
-   - `replace-editor.js` — defines `AceEditorAdapter`, a full reimplementation of the `SAS.Editor` API on top of Ace. It replaces the `SAS.Editor` constructor globally, patches `DMSEditor.prototype.createCodeEditor` so new tabs get Ace, and swaps the editor in already-open tabs while re-binding SAS Studio's event handlers (`textChanged`, `selectionChanged`, `caretMoved`).
+1. **Extension** (root: `manifest.json`, `sw.js`, `editor-swap.js`, `lib/`)
+   - `sw.js` — service worker; on toolbar click (or Alt+Period) injects `editor-swap.js` into the tab's MAIN world (idempotent — a no-op if already present), then calls `window.__ssExt.toggle(libPath)` there and sets the per-tab toolbar badge (`ON`/empty) from the returned `{ active }`.
+   - `editor-swap.js` — defines `AceEditorAdapter` (full reimplementation of the `SAS.Editor` API on top of Ace) and the `window.__ssExt` singleton (`active`, `activate`, `deactivate`, `toggle`, `loadNewAce`). On first injection it installs one-time dispatcher patches: `SAS.Editor` becomes a function returning either an `AceEditorAdapter` or the original editor depending on `__ssExt.active`, and `DMSEditor.prototype.createCodeEditor` is wrapped the same way (original saved on `__ssExt`, guarded by `_aceReplacementPatched`). `activate()`/`deactivate()` swap `window.ace` — plus the `ace_editor.css`/`ace-tm` style elements, held by reference and never re-queried by id — between the app's original bundled Ace and the newer one loaded from `lib/ace/src-noconflict/`, then walk every open tab converting its editor in place and re-binding `textChanged`/`selectionChanged`/`caretMoved`. Undo history does not survive a toggle in either direction.
    - `lib/ace/src-noconflict/ext-browse_ss.js` — custom Ace extension (not upstream) for browsing SAS Studio files/tabs from within the editor. Other files under `lib/ace/` are stock Ace; don't hand-edit them.
-   - Designed to run once per page load; a second activation requires a page refresh.
+   - The toggle is idempotent and repeatable — no page refresh needed to switch back and forth.
 
 2. **Userscript** (`ss-fixes.user.js`) — Tampermonkey-style script with ~25 independent fixes/features (tab management, tree navigation, keyboard shortcuts, clipboard, context menus). Each feature is a function in the `ALL_TOOLS` object, all invoked on startup after `.dijitTreeNode` appears. Features register buttons/hotkeys through the shared `toolBar.createToolBtn(callback, btn, keyMap)` helper. The dominant pattern is wrap-and-delegate: save the original method (e.g. `tabs.closeTab`), replace it with a wrapper that calls through.
 
@@ -36,4 +36,4 @@ Two independent delivery mechanisms, both patching the same app:
 
 ## Development
 
-No build. To test extension changes: `chrome://extensions/` → reload the unpacked extension → refresh the SAS Studio page → activate (Alt+Period). Userscript changes: update the script in Tampermonkey and refresh. All extension logs are prefixed `[Extension]`, `[Ace Cleanup]`, `[Ace Loader]`, `[Ace Replacement]`.
+No build. To test extension changes: `chrome://extensions/` → reload the unpacked extension → refresh the SAS Studio page → toggle (Alt+Period). Userscript changes: update the script in Tampermonkey and refresh. All extension logs are prefixed `[SS Ext]`; expect one line per toggle (`activated`/`deactivated ... N tab(s) ...`) plus errors/warnings only.
