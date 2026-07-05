@@ -95,7 +95,8 @@ Clicking the toolbar button injects `editor-swap.js` into the page's MAIN world
 (a no-op if it's already there) and calls `window.__ssExt.toggle(libPath)`:
 
 - **First load** fetches the newer Ace library from `lib/ace/src-noconflict/`
-  (`ace.js`, `ext-language_tools.js`, `ext-browse_ss.js`) and backs up a
+  (`ace.js`, `ext-language_tools.js`, `ext-browse_ss.js`, `ext-prompt.js`,
+  `ext-settings_menu.js`) and backs up a
   reference to the app's original bundled Ace so `window.ace` can be swapped
   back later. The new library's CSS stays attached permanently once loaded —
   SAS Studio renders its own editor DOM and never references any Ace CSS
@@ -123,8 +124,8 @@ replacement, so browse prompts work even while the built-in editor is still in u
 `ss-fixes.js` (injected automatically on every SAS Studio page load) provides
 ~25 independent fixes on top of the editor toggle: tab management, tree
 navigation, keyboard shortcuts, clipboard, context menus. Quick actions
-(reload file, close tab, focus tree, ...) are one click away in the popup, each
-with its default hotkey shown alongside. Passive patches (confirm-on-drop,
+(reload file, close tab, focus tree, ...) live in the command palette
+(Alt+Shift+P), each with its default hotkey shown alongside. Passive patches (confirm-on-drop,
 middle-click-close, keep-alive, ...) and hotkey bindings are configured from
 the options page (`chrome.runtime.openOptionsPage()`, linked from the popup) —
 patch/hotkey changes apply on the next page reload.

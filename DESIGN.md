@@ -1,5 +1,14 @@
 # Design plan
 
+> **Status (2026-07): historical.** Phases 1–3 shipped; only Phase 4 (LSP, optional)
+> remains open. Several features were added after this plan was written (command
+> palette on stock ext-prompt with a global Alt+Shift+P hotkey, editable Ace text
+> viewer for "View file as text", native mouse handling toggle, persistent Ace
+> config with settings-menu persistence + vimrc via relay.js). Some names below
+> differ from the implementation (`replace-editor.js` → `editor-swap.js`,
+> `window.__ssExtActive` → `window.__ssExt.active`, popup action buttons → command
+> palette entries). See README.md / AGENTS.md for the current architecture.
+
 Goal: extension replaces SAS Studio's editor with modern Ace + SAS language support, with
 a toggle back to the original editor; userscript fixes folded into the extension with a
 feature-selection popup. LSP is a possible later addition, not a priority.
