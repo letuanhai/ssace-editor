@@ -77,6 +77,11 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
     const libPath = chrome.runtime.getURL(LIB_PATH);
     const snippetsText = await getSnippetsText();
 
+    if (command === "command_palette") {
+      await injectAndRun(tab.id, (path) => window.__ssExt.commandPalette(path), [libPath]);
+      return;
+    }
+
     let result;
     if (command === "toggle_editor") {
       result = await injectAndRun(tab.id, (path, snippets) => window.__ssExt.toggle(path, snippets), [libPath, snippetsText]);
@@ -117,6 +122,30 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       target: { tabId },
       func: (s) => window.__ssf.init(s),
       args: [settings],
+      world: "MAIN",
+    });
+
+    // Pre-inject editor-swap.js (idempotent) with libPath/snippets known, so the
+    // global command-palette hotkey (ss-fixes.js's commandPalette action) can
+    // call window.__ssExt.commandPalette() with no args and it'll have what it
+    // needs to load the Ace lib on demand.
+    const libPath = chrome.runtime.getURL(LIB_PATH);
+    const snippetsText = await getSnippetsText();
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["editor-swap.js"],
+      world: "MAIN",
+    });
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (path, snippets) => {
+        // Unconditional: libPath is always this same constant, and userSnippets
+        // just mirrors current storage - re-setting either to the same value on
+        // repeat onUpdated firings is harmless (ace/toggle() aren't touched here).
+        window.__ssExt.libPath = path;
+        window.__ssExt.userSnippets = snippets;
+      },
+      args: [libPath, snippetsText],
       world: "MAIN",
     });
   } catch (error) {

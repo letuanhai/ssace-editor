@@ -14,8 +14,13 @@ everything lives in the extension.
 - Text, cursor position, and dirty (`*`) state are preserved across a toggle;
   undo history is not (see Known Limitations)
 - ~25 UX fixes/quick actions (tab management, tree navigation, keyboard shortcuts,
-  clipboard, context menus) — quick actions live in the popup, on/off toggles and
-  hotkey rebinding live in the options page
+  clipboard, context menus) — quick actions live in the command palette, on/off
+  toggles and hotkey rebinding live in the options page
+- Command palette (popup button, global hotkey **Alt+Shift+P** — rebindable in
+  the options page like any other action — or an unassigned
+  `chrome://extensions/shortcuts` command) works even with no Ace editor focused:
+  it lists every `SS-Ext: ...` action plus, if an Ace editor (code or text
+  viewer) was focused when it opened, that editor's own commands applied to it
 - While Ace is active, "View file as text" opens in an editable Ace editor that
   mirrors the underlying (hidden) SimpleTextarea so SAS Studio's own load/refresh
   code keeps working. Editing marks the tab dirty (`*` in the title, like the code
@@ -34,9 +39,12 @@ everything lives in the extension.
 2. Click the extension icon to open the popup, then "Toggle Ace editor" (or press
    **Alt+Period** directly) to toggle Ace on
 3. Click again (or Alt+Period again) to toggle back to the original editor
-4. Use the popup for quick actions (reload file, focus tree, close tab, ...);
-   use the options page (link in the popup, or right-click the icon → Options)
-   to turn UX patches on/off, rebind hotkeys, or edit custom snippets
+4. Use the popup's "Command palette…" button (**Alt+Shift+P**, or bind the
+   `command_palette` command at `chrome://extensions/shortcuts`) for quick actions (reload file,
+   focus tree, close tab, ...) and, when an Ace editor is focused, that editor's
+   own commands; use the options page (link in the popup, or right-click the
+   icon → Options) to turn UX patches on/off, rebind hotkeys, or edit custom
+   snippets
 
 ## How It Works
 
@@ -106,11 +114,13 @@ every open SAS Studio tab immediately (no reload needed) via a
 - `tools-meta.js` — shared `SSF_TOOLS` metadata (labels/titles/hotkeys) for
   ss-fixes, the popup, and the options page
 - `defaults.js` — shared `DEFAULT_SAS_SNIPPETS` default snippet text
-- `popup.html`/`popup.js` — quick actions + editor toggle
+- `popup.html`/`popup.js` — editor toggle, native-mouse toggle, command palette button
 - `options.html`/`options.js` — patch toggles, hotkey rebinding, snippet editor
-- `lib/ace/src-noconflict/` — the newer Ace library; `ext-browse_ss.js` is custom,
-  everything else is stock Ace (don't hand-edit, including `snippets/sas.js` —
-  custom snippets live in `defaults.js`/storage now)
+- `lib/ace/src-noconflict/` — the newer Ace library; `ext-browse_ss.js` is
+  custom, everything else is stock Ace (don't hand-edit, including
+  `snippets/sas.js` — custom snippets live in `defaults.js`/storage now).
+  The command palette is built on the stock `ext-prompt.js` module, not a
+  custom one.
 - `SAS_EDITOR_API.md`, `sas-editor.d.ts`, `EDITOR_USAGE_MAP.md` — reference docs
   for the `SAS.Editor` API surface `AceEditorAdapter` implements
 

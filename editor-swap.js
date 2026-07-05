@@ -84,7 +84,13 @@
         name: "openCommandPalette",
         description: "Open command palette",
         bindKey: { win: "Alt-Shift-P", mac: "Command-Shift-P" },
-        exec: (editor) => editor.prompt({ $type: "commands" }),
+        exec: () => {
+          try {
+            openCommandPalette(this.aceEditor);
+          } catch (e) {
+            console.error("[SS Ext] Could not open command palette:", e);
+          }
+        },
         readOnly: true,
       });
       // Let SAS Studio handle F3/F4 instead of Ace's find-next/find-prev.
@@ -331,11 +337,13 @@
     userSnippets: "", // stashed by toggle()/browse() before the ace lib loads
     _userSnippetsParsed: null, // previously-registered parsed snippets, for unregister
     _textViewers: [], // live { pane, tabHolder, adapter, item, textarea, origSet, origResize, editable, dirty, buttons } entries
+    libPath: null, // stashed by loadNewAce() so the palette's editor-toggle command can call toggle(ssExt.libPath)
     activate,
     deactivate,
     toggle,
     loadNewAce,
     browse,
+    commandPalette,
     applySnippets,
   };
   window.__ssExt = ssExt;
@@ -375,6 +383,7 @@
   }
 
   async function loadNewAce(libPath) {
+    ssExt.libPath = libPath;
     if (ssExt.newAceLoaded) return;
     backupOrigAce();
 
@@ -395,6 +404,7 @@
 
     await loadScript(`${libPath}/ext-language_tools.js`);
     await loadScript(`${libPath}/ext-browse_ss.js`);
+    await loadScript(`${libPath}/ext-prompt.js`);
 
     ssExt.newLib = { ace: window.ace };
     ssExt.newAceLoaded = true;
@@ -1022,6 +1032,168 @@
       () => doBrowse(kind, libPath),
       () => doBrowse(kind, libPath),
     );
+    return ssExt._pending;
+  }
+
+  // -- Command palette ------------------------------------------------------------
+
+  // Find the Ace editor focused when the palette is about to open, if any: text
+  // viewers first, then code-editor tabs. Returns null if nothing is focused (or
+  // nothing is an Ace instance at all, e.g. the toggle was never activated).
+  function focusedAceEditor() {
+    const viewer = ssExt._textViewers.find(
+      (e) => e.adapter && e.adapter.aceEditor && e.adapter.aceEditor.isFocused(),
+    );
+    if (viewer) return viewer.adapter.aceEditor;
+
+    if (typeof appDMS !== "undefined" && appDMS.tabs && appDMS.tabs.getAllTabObjects) {
+      const tabObj = appDMS.tabs
+        .getAllTabObjects()
+        .find(
+          (t) =>
+            t.editor &&
+            t.editor.editor &&
+            t.editor.editor.aceEditor &&
+            t.editor.editor.aceEditor.isFocused(),
+        );
+      if (tabObj) return tabObj.editor.editor.aceEditor;
+    }
+
+    return null;
+  }
+
+  // -- Command palette (built on ace/ext/prompt's generic prompt()) -------------
+
+  function hotkeyHint(hotkey) {
+    if (!hotkey || !hotkey.key) return "";
+    let name = hotkey.key;
+    name = (hotkey.altKey ? "Alt+" : "") + name;
+    name = (hotkey.metaKey ? "Meta+" : "") + name;
+    name = (hotkey.ctrlKey ? "Ctrl+" : "") + name;
+    return name;
+  }
+
+  // "gotoline" -> "Gotoline", "openCommandPalette" -> "Open command palette"
+  // (same display normalization as prompt.commands in ext-prompt.js).
+  function normalizeName(name) {
+    return (name || "")
+      .replace(/^./, (x) => x.toUpperCase())
+      .replace(/[a-z][A-Z]/g, (x) => x[0] + " " + x[1].toLowerCase());
+  }
+
+  // Mirrors prompt.commands' getEditorCommandsByName (ext-prompt.js): walks
+  // editor.keyBinding.$handlers, dedupes by command name, concatenates keys
+  // for a command bound in multiple handlers.
+  function getEditorCommandsByName(editor) {
+    const excludeCommands = ["insertstring", "inserttext", "setIndentation", "paste"];
+    const commandMap = {};
+    const commandsByName = [];
+    (editor.keyBinding.$handlers || []).forEach((handler) => {
+      const platform = handler.platform;
+      const byName = handler.byName || {};
+      Object.keys(byName).forEach((name) => {
+        const cmd = byName[name];
+        let key = cmd.bindKey;
+        if (typeof key !== "string") key = (key && key[platform]) || "";
+        const description = cmd.description || normalizeName(cmd.name || name);
+        const cmds = Array.isArray(cmd) ? cmd : [cmd];
+        cmds.forEach((command) => {
+          const cname = typeof command === "string" ? command : command.name;
+          if (!cname || excludeCommands.indexOf(cname) !== -1) return;
+          if (commandMap[cname]) {
+            commandMap[cname].key += "|" + key;
+          } else {
+            commandMap[cname] = { key, command: cname, description };
+            commandsByName.push(commandMap[cname]);
+          }
+        });
+      });
+    });
+    return commandsByName;
+  }
+
+  // Builds the palette's entries (plain data, JSON-clonable - prompt.commands'
+  // getCompletions clones them) plus a side-table of runners keyed by
+  // entry.command, since functions don't survive that clone.
+  function buildPaletteEntries(focusedEditor) {
+    const runners = {};
+    const entries = [];
+
+    (window.SSF_TOOLS || [])
+      .filter((t) => t.kind === "action")
+      .forEach((tool) => {
+        const key = "ssext:" + tool.name;
+        runners[key] = () => window.__ssf.run(tool.name);
+        entries.push({ value: "SS-Ext: " + tool.label, meta: hotkeyHint(tool.hotkey), command: key });
+      });
+    runners["ssext:toggleAce"] = () => ssExt.toggle(ssExt.libPath);
+    entries.push({ value: "SS-Ext: Toggle Ace editor", meta: "", command: "ssext:toggleAce" });
+    runners["ssext:toggleNativeMouse"] = () => window.__ssf.run("toggleNativeMouse");
+    entries.push({ value: "SS-Ext: Toggle native mouse handling", meta: "", command: "ssext:toggleNativeMouse" });
+
+    if (focusedEditor) {
+      getEditorCommandsByName(focusedEditor).forEach((c) => {
+        if (runners[c.command]) return; // don't shadow an SS-Ext entry (unlikely)
+        runners[c.command] = () => focusedEditor.execCommand(c.command);
+        entries.push({ value: c.description, meta: c.key, command: c.command });
+      });
+    }
+
+    return { entries, runners };
+  }
+
+  function openCommandPalette(focusedEditor) {
+    const { entries, runners } = buildPaletteEntries(focusedEditor);
+    // Stashed for test/debug visibility - not read by any runtime code path.
+    window.__ssCmdPalette_lastList = entries;
+
+    const FilteredList = ssExt.newLib.ace.require("ace/autocomplete").FilteredList;
+    ssExt.newLib.ace.require("ace/ext/prompt").prompt(focusedEditor || null, "", {
+      name: "commands",
+      selection: [0, Number.MAX_VALUE],
+      onAccept: function (data) {
+        const runner = data.item && data.item.command && runners[data.item.command];
+        if (!runner) return;
+        try {
+          runner();
+        } catch (e) {
+          console.error("[SS Ext] command palette command failed:", e);
+        }
+      },
+      getPrefix: function (cmdLine) {
+        const currentPos = cmdLine.getCursorPosition();
+        return cmdLine.getValue().substring(0, currentPos.column);
+      },
+      getCompletions: function (cmdLine) {
+        const prefix = this.getPrefix(cmdLine);
+        // Clone like prompt.commands does - FilteredList mutates its input.
+        const cloned = JSON.parse(JSON.stringify(entries));
+        const filtered = new FilteredList(cloned).filterCompletions(cloned, prefix);
+        return filtered.length > 0 ? filtered : [{ value: "No matching commands", error: 1 }];
+      },
+    });
+  }
+
+  async function doCommandPalette() {
+    // Detect the focused editor BEFORE loading/opening the palette - opening the
+    // palette itself moves focus to the prompt's command line.
+    const focusedEditor = focusedAceEditor();
+
+    if (!ssExt.libPath) {
+      console.error("[SS Ext] commandPalette: no libPath known yet - can't load the Ace library");
+      return;
+    }
+    await loadNewAce(ssExt.libPath);
+    applySnippets(ssExt.userSnippets);
+
+    openCommandPalette(focusedEditor);
+  }
+
+  function commandPalette(libPath) {
+    if (libPath) ssExt.libPath = libPath;
+    // Serialize through the same _pending chain as toggle()/browse() so it can't
+    // race a concurrent toggle/activation.
+    ssExt._pending = (ssExt._pending || Promise.resolve()).then(doCommandPalette, doCommandPalette);
     return ssExt._pending;
   }
 })();

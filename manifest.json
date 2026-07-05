@@ -41,6 +41,9 @@
         "default": "Alt+T"
       },
       "description": "Select SAS Studio tabs"
+    },
+    "command_palette": {
+      "description": "Open the SS Ext command palette"
     }
   },
   "background": {

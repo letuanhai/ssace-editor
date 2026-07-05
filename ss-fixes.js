@@ -865,6 +865,13 @@ Add a prefix to the path for different option:
         currentTab.editor.focus();
       },
     },
+    commandPalette: {
+      // Global in-page hotkey/action: works even when the Ace editor replacement
+      // isn't active and nothing is focused. editor-swap.js is pre-injected (with
+      // libPath/snippets already set) by sw.js's onUpdated handler, so this no-arg
+      // call just needs window.__ssExt to exist.
+      fn: () => window.__ssExt && window.__ssExt.commandPalette && window.__ssExt.commandPalette(),
+    },
     toggleNativeMouse: {
       // Live "native mouse handling" toggle, no reload. When ON, a window-capture
       // handler stops PROPAGATION (never preventDefault) of the mouse-gesture

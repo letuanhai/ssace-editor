@@ -146,6 +146,16 @@ Add a prefix to the path for different option:
       title: "Focus the code editor of the current tab",
       hotkey: { key: ".", altKey: true },
     },
+    {
+      name: "commandPalette",
+      kind: "action",
+      label: "Command palette",
+      // event.key for Alt+Shift+P is "P" (uppercase) - the case-insensitive
+      // bindKey match means plain Alt+P also triggers this, same as other
+      // shifted-char hotkeys above (e.g. "}", "{", "|").
+      title: "Open the SS-Ext command palette",
+      hotkey: { key: "P", altKey: true },
+    },
 
     // -- Patches - passive behavior changes, applied once at init ----------------
     {

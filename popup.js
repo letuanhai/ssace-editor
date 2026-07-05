@@ -1,22 +1,12 @@
 /**
- * Popup: quick actions only. All configuration lives on the options page.
- *
- * Loaded after tools-meta.js (script tag in popup.html), so window.SSF_TOOLS
- * is already defined here.
+ * Popup: editor toggle, native-mouse toggle, and a button that opens the SS-Ext
+ * command palette (which now hosts the individual action buttons this popup used
+ * to render itself). All configuration lives on the options page.
  */
 (function () {
   "use strict";
 
   const LIB_PATH = "/lib/ace/src-noconflict";
-
-  function hotkeyHint(hotkey) {
-    if (!hotkey || !hotkey.key) return "";
-    let name = hotkey.key;
-    name = (hotkey.altKey ? "Alt+" : "") + name;
-    name = (hotkey.metaKey ? "Meta+" : "") + name;
-    name = (hotkey.ctrlKey ? "Ctrl+" : "") + name;
-    return name;
-  }
 
   async function getActiveTab() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -27,11 +17,6 @@
   async function getSnippetsText() {
     const { snippets } = await chrome.storage.local.get("snippets");
     return snippets && typeof snippets.sas === "string" ? snippets.sas : window.DEFAULT_SAS_SNIPPETS || "";
-  }
-
-  async function getHotkeySettings() {
-    const { hotkeys } = await chrome.storage.local.get("hotkeys");
-    return hotkeys || {};
   }
 
   async function injectAndRun(tabId, files, func, args) {
@@ -92,50 +77,22 @@
     }
   }
 
-  async function handleActionClick(name) {
+  async function handlePaletteClick() {
     const tab = await getActiveTab();
     if (!tab || tab.id === undefined) return;
     try {
-      // Files-inject tools-meta+ss-fixes first - idempotent, so this works even
-      // on a tab where sw's tabs.onUpdated injection hasn't fired yet.
-      await injectAndRun(tab.id, ["tools-meta.js", "ss-fixes.js"], (n) => window.__ssf && window.__ssf.run(n), [name]);
+      const libPath = chrome.runtime.getURL(LIB_PATH);
+      await injectAndRun(tab.id, ["editor-swap.js"], (path) => window.__ssExt.commandPalette(path), [libPath]);
+      window.close();
     } catch (e) {
-      console.error(`[SS Ext] popup action "${name}" failed:`, e);
+      console.error("[SS Ext] popup command palette failed:", e);
     }
-  }
-
-  function renderActions(hotkeySettings) {
-    const container = document.getElementById("actions");
-    (window.SSF_TOOLS || [])
-      .filter((t) => t.kind === "action")
-      .forEach((tool) => {
-        const hotkey = Object.prototype.hasOwnProperty.call(hotkeySettings, tool.name) ? hotkeySettings[tool.name] : tool.hotkey;
-        const btn = document.createElement("button");
-        btn.className = "action-btn";
-        btn.title = tool.title || tool.label;
-
-        const label = document.createElement("span");
-        label.textContent = tool.label;
-        btn.appendChild(label);
-
-        const hint = hotkeyHint(hotkey);
-        if (hint) {
-          const hintEl = document.createElement("span");
-          hintEl.className = "hotkey-hint";
-          hintEl.textContent = hint;
-          btn.appendChild(hintEl);
-        }
-
-        btn.addEventListener("click", () => handleActionClick(tool.name));
-        container.appendChild(btn);
-      });
   }
 
   document.getElementById("toggle-btn").addEventListener("click", handleToggleClick);
   document.getElementById("ctxmenu-btn").addEventListener("click", handleCtxMenuClick);
+  document.getElementById("palette-btn").addEventListener("click", handlePaletteClick);
   document.getElementById("options-link").addEventListener("click", () => chrome.runtime.openOptionsPage());
-
-  getHotkeySettings().then(renderActions);
 
   // Show the actual toggle state on open (opening the popup grants activeTab).
   (async () => {

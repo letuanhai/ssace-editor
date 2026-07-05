@@ -321,8 +321,102 @@ function check(name, ok, detail) {
     }
   }
 
+  // -- Command palette -------------------------------------------------------------
+  // Nothing focused: only SS-Ext entries should show up.
+  await page.evaluate(() => document.activeElement && document.activeElement.blur());
+  await page.evaluate((lp) => {
+    window.__ssExt.commandPalette(lp);
+  }, libPath);
+  await page.waitForTimeout(500);
+  const paletteNoFocusState = await page.evaluate(() => {
+    const overlay = document.querySelector(".ace_prompt_container");
+    const list = window.__ssCmdPalette_lastList || [];
+    return {
+      overlayPresent: !!overlay,
+      hasSsExtEntry: list.some((c) => c.value.startsWith("SS-Ext: ")),
+      hasBareAceCommand: list.some((c) => !c.value.startsWith("SS-Ext: ")),
+      count: list.length,
+    };
+  });
+  check("command palette (no focus) shows overlay", paletteNoFocusState.overlayPresent, paletteNoFocusState);
+  check("command palette (no focus) lists SS-Ext entries", paletteNoFocusState.hasSsExtEntry, paletteNoFocusState);
+  check("command palette (no focus) has no editor commands", !paletteNoFocusState.hasBareAceCommand, paletteNoFocusState);
+  await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27 })));
+  await page.waitForTimeout(300);
+  const paletteClosedAfterEsc = await page.evaluate(() => !document.querySelector(".ace_prompt_container"));
+  check("command palette closes on Esc", paletteClosedAfterEsc, { paletteClosedAfterEsc });
+
+  // With a code editor (an Ace instance) focused: editor commands should also
+  // show up. Reuses any currently-open code tab rather than the (now-closed)
+  // text viewer from the block above.
+  const focusedForPalette = await page.evaluate(async () => {
+    const tabObj = window.appDMS.tabs
+      .getAllTabObjects()
+      .find((t) => t.editor && t.editor.editor && t.editor.editor.aceEditor);
+    if (!tabObj) return false;
+    window.appDMS.tabs.selectTab(tabObj);
+    tabObj.editor.editor.aceEditor.focus();
+    await new Promise((r) => setTimeout(r, 100));
+    return tabObj.editor.editor.aceEditor.isFocused();
+  });
+  if (!focusedForPalette) {
+    check("command palette (editor focused) test setup - a code editor is focused (skipped: no code tab open)", false, {
+      focusedForPalette,
+    });
+  } else {
+    await page.evaluate((lp) => {
+      window.__ssExt.commandPalette(lp);
+    }, libPath);
+    await page.waitForTimeout(500);
+    const paletteWithFocusState = await page.evaluate((baselineCount) => {
+      const overlay = document.querySelector(".ace_prompt_container");
+      const list = window.__ssCmdPalette_lastList || [];
+      return {
+        overlayPresent: !!overlay,
+        count: list.length,
+        moreThanBaseline: list.length > baselineCount,
+        // entries display description text now, not command ids
+        hasKnownAceCommand: list.some((c) => c.command === "find" || c.command === "gotoline"),
+        displaysDescriptionText: list.some((c) => c.command === "find" && c.value !== "find"),
+      };
+    }, paletteNoFocusState.count);
+    check("command palette (editor focused) shows overlay", paletteWithFocusState.overlayPresent, paletteWithFocusState);
+    check(
+      "command palette (editor focused) includes editor commands with description text",
+      paletteWithFocusState.moreThanBaseline &&
+        paletteWithFocusState.hasKnownAceCommand &&
+        paletteWithFocusState.displaysDescriptionText,
+      paletteWithFocusState,
+    );
+    await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27 })));
+    await page.waitForTimeout(300);
+  }
+
   const deactivated = await page.evaluate((lp) => window.__ssExt.toggle(lp), libPath);
   check("Ace editor replacement deactivates cleanly", deactivated && deactivated.active === false, deactivated);
+
+  // -- Global command-palette hotkey (Alt+Shift+P), Ace NOT activated ------------
+  // Exercises sw.js's tabs.onUpdated pre-injection (editor-swap.js + seeded
+  // ssExt.libPath/userSnippets) - the ss-fixes.js hotkey calls
+  // window.__ssExt.commandPalette() with no args, so it only works if that
+  // pre-injection already ran.
+  await page.evaluate(() =>
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "P", altKey: true, shiftKey: true, bubbles: true }),
+    ),
+  );
+  await page.waitForTimeout(500);
+  const hotkeyPaletteState = await page.evaluate(() => ({
+    active: window.__ssExt.active,
+    overlayPresent: !!document.querySelector(".ace_prompt_container"),
+  }));
+  check(
+    "global Alt+Shift+P hotkey opens the command palette with Ace not activated",
+    !hotkeyPaletteState.active && hotkeyPaletteState.overlayPresent,
+    hotkeyPaletteState,
+  );
+  await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27 })));
+  await page.waitForTimeout(300);
 
   await ctx.close();
   console.log(failures ? `\n${failures} check(s) FAILED` : "\nAll checks passed");
