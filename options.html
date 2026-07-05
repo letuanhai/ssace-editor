@@ -101,10 +101,24 @@
       #save-snippets {
         margin-top: 8px;
       }
-      #save-status {
+      #save-status,
+      #vimrc-save-status {
         margin-left: 10px;
         color: var(--ok);
         font-size: 12px;
+      }
+      #vimrc-editor {
+        width: 100%;
+        height: 6em;
+        font-family: monospace;
+        font-size: 13px;
+        background: var(--btn-bg);
+        color: var(--fg);
+        border: 1px solid var(--btn-border);
+        box-sizing: border-box;
+      }
+      #save-vimrc {
+        margin-top: 8px;
       }
     </style>
   </head>
@@ -128,6 +142,31 @@
       <tbody id="hotkeys-list"></tbody>
     </table>
 
+    <h2>Editor</h2>
+    <p class="note">
+      Defaults for every Ace editor in SAS Studio (code editor, text viewer) and for the snippet editor below.
+      Live-applies to open SAS Studio tabs on change. Theme is a dark/light pair (auto-switches with OS preference) -
+      configured only here. Every other setting - including the keyboard handler (None/Vim/Emacs/Sublime/VSCode) -
+      is configured from Ace's own stock settings panel (<code>Ctrl-,</code> in any editor, or the "Show settings
+      menu" entry in the command palette when one is focused); changes made there now persist as the default for
+      new editors and live-apply to open ones, same as this page.
+    </p>
+    <label>Dark theme <select id="ace-dark-theme"></select></label>
+    <label>Light theme <select id="ace-light-theme"></select></label>
+
+    <h3>Vim config</h3>
+    <p class="note">
+      Applied to the shared vim keyboard handler (only takes effect once "Vim" is the active keyboard handler).
+      One mapping per line, <code>"</code> starts a comment. Supported:
+      <code>map</code>/<code>nmap</code>/<code>imap</code>/<code>vmap &lt;lhs&gt; &lt;rhs&gt;</code>,
+      <code>noremap</code>/<code>nnoremap</code>/<code>inoremap</code>/<code>vnoremap</code> (same, non-recursive),
+      and <code>unmap</code>/<code>nunmap</code>/<code>iunmap</code>/<code>vunmap &lt;lhs&gt;</code>. Anything else is
+      skipped with a console warning. Removing a line here doesn't undo the mapping until the page is reloaded.
+    </p>
+    <textarea id="vimrc-editor" spellcheck="false"></textarea>
+    <button id="save-vimrc">Save vim config</button>
+    <span id="vimrc-save-status"></span>
+
     <h2>Snippets</h2>
     <p class="note">
       Native Ace snippet format (<code>snippet trigger</code> / tab-indented body). Additive over the built-in SAS
@@ -141,8 +180,8 @@
     <script src="defaults.js"></script>
     <script src="lib/ace/src-noconflict/ace.js"></script>
     <script src="lib/ace/src-noconflict/mode-snippets.js"></script>
-    <script src="lib/ace/src-noconflict/theme-gruvbox.js"></script>
-    <script src="lib/ace/src-noconflict/theme-iplastic.js"></script>
+    <script src="lib/ace/src-noconflict/ext-themelist.js"></script>
+    <script src="lib/ace/src-noconflict/ext-settings_menu.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

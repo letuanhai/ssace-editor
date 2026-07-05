@@ -26,6 +26,49 @@ everything lives in the extension.
   code keeps working. Editing marks the tab dirty (`*` in the title, like the code
   editor); save with the Save button next to Refresh, `Ctrl/Cmd+S`, or vim `:w` —
   Save POSTs to the workspace endpoint. Vim `:q`/`:wq`/`:x` close (and save) the tab
+- Persistent editor configuration: Ace's own stock settings menu (`Ctrl-,`/
+  `Cmd-,`, or "Show settings menu" in the command palette when an editor is
+  focused — no custom preferences panel) is the settings UI. Any option changed
+  there (font size, tab size, soft wrap, keyboard handler, ...) becomes the
+  default for every new editor and live-applies to open ones; the theme knob is
+  ignored (see below). The options page configures the dark/light theme pair
+  and a small vimrc (`map`/`noremap`/`unmap` and their n/i/v variants) for the
+  Vim keyboard handler, and both flow into the same shared config
+
+## Editor configuration
+
+`chrome.storage.local.aceConfig` (`{ darkTheme, lightTheme, options: { ... },
+vimrc }`, default in `defaults.js`'s `DEFAULT_ACE_CONFIG`) is the single source
+of truth for every Ace editor's defaults — the SAS Studio code editor, the
+text-viewer overlay, and the options page's snippet editor. It flows two ways:
+
+- **Stock settings menu → storage → everywhere else**: MAIN-world code can't
+  touch `chrome.storage`, so a prototype-level hook on the settings menu's
+  `OptionPanel.setOption` (patched once, after the original runs)
+  `window.postMessage`s the updated config; `relay.js` (an ISOLATED-world
+  content script) is the only thing listening and persists it. `sw.js`'s
+  `storage.onChanged` listener then pushes the merged config to every open SAS
+  Studio tab (`window.__ssExt.applyAceConfig`) and options.html picks it up
+  too. The options page's snippet editor gets the identical hook, writing
+  straight to storage instead.
+- **Options page → storage → SAS Studio tabs**: the dark/light theme pair and
+  vim config write straight to storage; the same `sw.js` listener pushes them
+  out.
+
+Theme is the one exception: it's always a `darkTheme`/`lightTheme` pair chosen
+from the options page (auto-switched by OS `prefers-color-scheme`, matching the
+existing behavior) — the panel's single "theme" option can't express a pair, so
+a theme change made there is deliberately not persisted.
+
+### Vim config
+
+`aceConfig.vimrc` is a small subset of vim config, applied to the shared
+`ace/keyboard/vim` module (only takes effect once Vim is the active keyboard
+handler): one mapping per line, `"` starts a comment, blank lines are skipped.
+Supported: `map`/`nmap`/`imap`/`vmap <lhs> <rhs>`, the `noremap` variants
+(non-recursive), and `unmap`/`nunmap`/`iunmap`/`vunmap <lhs>`. Anything else is
+skipped with a console warning. Removing a line doesn't undo that mapping until
+the page is reloaded.
 
 ## Installation
 
@@ -107,20 +150,24 @@ every open SAS Studio tab immediately (no reload needed) via a
 ## Files
 
 - `manifest.json`, `sw.js` — extension config + service worker (editor toggle,
-  ss-fixes injection, live snippet apply)
-- `editor-swap.js` — `AceEditorAdapter`, the `window.__ssExt` singleton, and the
-  one-time SAS.Editor/DMSEditor patches
+  ss-fixes injection, live snippet apply, live ace-config apply)
+- `relay.js` — ISOLATED-world content script; the only bridge from the
+  in-page settings panel (MAIN world) to `chrome.storage.local.aceConfig`
+- `editor-swap.js` — `AceEditorAdapter`, the `window.__ssExt` singleton, the
+  one-time SAS.Editor/DMSEditor patches, and the settings-menu persistence hook
 - `ss-fixes.js` — ~25 UX fixes, split into one-shot `ACTIONS` and passive `PATCHES`
 - `tools-meta.js` — shared `SSF_TOOLS` metadata (labels/titles/hotkeys) for
   ss-fixes, the popup, and the options page
-- `defaults.js` — shared `DEFAULT_SAS_SNIPPETS` default snippet text
+- `defaults.js` — shared `DEFAULT_SAS_SNIPPETS`/`DEFAULT_ACE_CONFIG` defaults
 - `popup.html`/`popup.js` — editor toggle, native-mouse toggle, command palette button
-- `options.html`/`options.js` — patch toggles, hotkey rebinding, snippet editor
+- `options.html`/`options.js` — patch toggles, hotkey rebinding, editor config
+  (theme pair, vim config), snippet editor
 - `lib/ace/src-noconflict/` — the newer Ace library; `ext-browse_ss.js` is
   custom, everything else is stock Ace (don't hand-edit, including
   `snippets/sas.js` — custom snippets live in `defaults.js`/storage now).
-  The command palette is built on the stock `ext-prompt.js` module, not a
-  custom one.
+  The command palette is built on the stock `ext-prompt.js` module, and the
+  settings menu is the stock `ext-settings_menu.js` module (bundles its own
+  `OptionPanel`, `overlayPage`, and `themelist`) — neither is custom.
 - `SAS_EDITOR_API.md`, `sas-editor.d.ts`, `EDITOR_USAGE_MAP.md` — reference docs
   for the `SAS.Editor` API surface `AceEditorAdapter` implements
 

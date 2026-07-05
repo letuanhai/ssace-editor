@@ -1,7 +1,7 @@
 /**
  * Background service worker.
  *
- * Three independent jobs:
+ * Four independent jobs:
  *
  * 1. Editor toggle (Alt+Period / toggle_editor command, or the popup's toggle
  *    button): inject editor-swap.js (idempotent - no-ops if already present),
@@ -13,9 +13,17 @@
  * 2. ss-fixes injection: on every SASStudio page load (tabs.onUpdated), inject
  *    tools-meta.js + ss-fixes.js into the MAIN world and call
  *    window.__ssf.init(settings) with the persisted patch/hotkey settings.
+ *    The same handler pre-injects editor-swap.js and seeds
+ *    libPath/userSnippets/aceConfig so the global command-palette hotkey works
+ *    without a prior toggle.
  *
  * 3. Live snippet apply: when chrome.storage.local's `snippets` changes, push
  *    the new text into every open SASStudio tab via window.__ssExt.applySnippets.
+ *
+ * 4. Live ace config apply: when chrome.storage.local's `aceConfig` changes
+ *    (from the in-page settings panel via relay.js, or from options.html),
+ *    push the merged config into every open SASStudio tab via
+ *    window.__ssExt.applyAceConfig.
  */
 
 importScripts("defaults.js");
@@ -62,6 +70,25 @@ async function showErrorAlert(tabId, message) {
 async function getSnippetsText() {
   const { snippets } = await chrome.storage.local.get("snippets");
   return snippets && typeof snippets.sas === "string" ? snippets.sas : DEFAULT_SAS_SNIPPETS;
+}
+
+// Stored value wins per-key over DEFAULT_ACE_CONFIG (shallow merge of the top
+// level and of `options`). Shared by the onUpdated seed and the live-apply
+// storage listener below.
+function mergeAceConfig(stored) {
+  stored = stored || {};
+  return {
+    darkTheme: stored.darkTheme || DEFAULT_ACE_CONFIG.darkTheme,
+    lightTheme: stored.lightTheme || DEFAULT_ACE_CONFIG.lightTheme,
+    options: Object.assign({}, DEFAULT_ACE_CONFIG.options, stored.options || {}),
+    // Unset -> default; a saved value wins even when empty (user cleared it).
+    vimrc: typeof stored.vimrc === "string" ? stored.vimrc : DEFAULT_ACE_CONFIG.vimrc,
+  };
+}
+
+async function getAceConfig() {
+  const { aceConfig } = await chrome.storage.local.get("aceConfig");
+  return mergeAceConfig(aceConfig);
 }
 
 const BROWSE_COMMANDS = {
@@ -125,12 +152,13 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       world: "MAIN",
     });
 
-    // Pre-inject editor-swap.js (idempotent) with libPath/snippets known, so the
-    // global command-palette hotkey (ss-fixes.js's commandPalette action) can
-    // call window.__ssExt.commandPalette() with no args and it'll have what it
-    // needs to load the Ace lib on demand.
+    // Pre-inject editor-swap.js (idempotent) with libPath/snippets/aceConfig known,
+    // so the global command-palette hotkey (ss-fixes.js's commandPalette action)
+    // can call window.__ssExt.commandPalette() with no args and it'll have what
+    // it needs to load the Ace lib on demand.
     const libPath = chrome.runtime.getURL(LIB_PATH);
     const snippetsText = await getSnippetsText();
+    const aceConfig = await getAceConfig();
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ["editor-swap.js"],
@@ -138,14 +166,16 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     });
     await chrome.scripting.executeScript({
       target: { tabId },
-      func: (path, snippets) => {
-        // Unconditional: libPath is always this same constant, and userSnippets
-        // just mirrors current storage - re-setting either to the same value on
-        // repeat onUpdated firings is harmless (ace/toggle() aren't touched here).
+      func: (path, snippets, config) => {
+        // Unconditional: libPath is always this same constant, and userSnippets/
+        // aceConfig just mirror current storage - re-setting any of them to the
+        // same value on repeat onUpdated firings is harmless (ace/toggle() aren't
+        // touched here).
         window.__ssExt.libPath = path;
         window.__ssExt.userSnippets = snippets;
+        window.__ssExt.aceConfig = config;
       },
-      args: [libPath, snippetsText],
+      args: [libPath, snippetsText, aceConfig],
       world: "MAIN",
     });
   } catch (error) {
@@ -156,28 +186,54 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 // -- Live snippet apply on storage change --------------------------------------
 
 chrome.storage.onChanged.addListener(async (changes, areaName) => {
-  if (areaName !== "local" || !changes.snippets) return;
+  if (areaName !== "local") return;
 
-  const newValue = changes.snippets.newValue;
-  const text = newValue && typeof newValue.sas === "string" ? newValue.sas : DEFAULT_SAS_SNIPPETS;
+  if (changes.snippets) {
+    const newValue = changes.snippets.newValue;
+    const text = newValue && typeof newValue.sas === "string" ? newValue.sas : DEFAULT_SAS_SNIPPETS;
 
-  try {
-    const tabs = await chrome.tabs.query({ url: "*://*/SASStudio/*" });
-    await Promise.all(
-      tabs.map((tab) =>
-        chrome.scripting
-          .executeScript({
-            target: { tabId: tab.id },
-            func: (snippetsText) => {
-              window.__ssExt && window.__ssExt.applySnippets && window.__ssExt.applySnippets(snippetsText);
-            },
-            args: [text],
-            world: "MAIN",
-          })
-          .catch(() => {}), // no-op if editor-swap.js isn't loaded in that tab
-      ),
-    );
-  } catch (error) {
-    console.error("[SS Ext] Error live-applying snippets:", error);
+    try {
+      const tabs = await chrome.tabs.query({ url: "*://*/SASStudio/*" });
+      await Promise.all(
+        tabs.map((tab) =>
+          chrome.scripting
+            .executeScript({
+              target: { tabId: tab.id },
+              func: (snippetsText) => {
+                window.__ssExt && window.__ssExt.applySnippets && window.__ssExt.applySnippets(snippetsText);
+              },
+              args: [text],
+              world: "MAIN",
+            })
+            .catch(() => {}), // no-op if editor-swap.js isn't loaded in that tab
+        ),
+      );
+    } catch (error) {
+      console.error("[SS Ext] Error live-applying snippets:", error);
+    }
+  }
+
+  if (changes.aceConfig) {
+    const config = mergeAceConfig(changes.aceConfig.newValue);
+
+    try {
+      const tabs = await chrome.tabs.query({ url: "*://*/SASStudio/*" });
+      await Promise.all(
+        tabs.map((tab) =>
+          chrome.scripting
+            .executeScript({
+              target: { tabId: tab.id },
+              func: (cfg) => {
+                window.__ssExt && window.__ssExt.applyAceConfig && window.__ssExt.applyAceConfig(cfg);
+              },
+              args: [config],
+              world: "MAIN",
+            })
+            .catch(() => {}), // no-op if editor-swap.js isn't loaded in that tab
+        ),
+      );
+    } catch (error) {
+      console.error("[SS Ext] Error live-applying ace config:", error);
+    }
   }
 });

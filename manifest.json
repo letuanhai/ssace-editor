@@ -49,6 +49,13 @@
   "background": {
     "service_worker": "sw.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["*://*/SASStudio/*"],
+      "js": ["relay.js"],
+      "run_at": "document_start"
+    }
+  ],
   "host_permissions": [
     "*://*/SASStudio/*"
   ],

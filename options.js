@@ -1,7 +1,8 @@
 /**
- * Options page: patches (on/off), hotkeys (record/clear), snippets (Ace editor + save).
- * Everything persists to chrome.storage.local; ss-fixes.js reads it back via
- * sw.js's tabs.onUpdated injection (see DESIGN.md Phase 3).
+ * Options page: patches (on/off), hotkeys (record/clear), editor config (theme
+ * pair/keyboard handler/generic ace options), snippets (Ace editor + save).
+ * Everything persists to chrome.storage.local; ss-fixes.js/editor-swap.js read
+ * it back via sw.js's tabs.onUpdated injection and storage.onChanged pushes.
  */
 (function () {
   "use strict";
@@ -115,18 +116,174 @@
     });
   }
 
+  // -- Editor config (theme pair + keyboard handler + snippet editor) ---------------
+  // Config flows both ways: this page writes chrome.storage.local.aceConfig (which
+  // sw.js live-pushes into SAS Studio tabs via window.__ssExt.applyAceConfig), and
+  // reads it back on storage.onChanged (e.g. after an in-page settings-panel change,
+  // relayed by relay.js) so the selects and the snippet editor stay in sync.
+
+  // Ace resolves "ace/keyboard/<name>" to keyboard-<name>.js by default, but the
+  // vendored files are keybinding-<name>.js - same override as editor-swap.js's
+  // loadNewAce, needed before any handler other than "" (Ace/none) can load.
+  ace.config.set("basePath", "lib/ace/src-noconflict");
+  ["vim", "emacs", "sublime", "vscode"].forEach((name) => {
+    ace.config.setModuleUrl(`ace/keyboard/${name}`, `lib/ace/src-noconflict/keybinding-${name}.js`);
+  });
+
+  function mergeAceConfig(stored) {
+    stored = stored || {};
+    const defaults = window.DEFAULT_ACE_CONFIG || { darkTheme: "ace/theme/gruvbox", lightTheme: "ace/theme/iplastic", options: {}, vimrc: "" };
+    return {
+      darkTheme: stored.darkTheme || defaults.darkTheme,
+      lightTheme: stored.lightTheme || defaults.lightTheme,
+      options: Object.assign({}, defaults.options, stored.options || {}),
+      // Unset -> default; a saved value wins even when empty (user cleared it).
+      vimrc: typeof stored.vimrc === "string" ? stored.vimrc : defaults.vimrc,
+    };
+  }
+
+  // -- vimrc parsing (duplicated from editor-swap.js's applyVimrcLine - the two
+  // worlds can't share a file; keep this small). See options.html for the
+  // supported-syntax note shown to the user.
+  const VIMRC_CTX = { n: "normal", i: "insert", v: "visual" };
+
+  function applyVimrcLine(Vim, line) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.charAt(0) === '"') return;
+
+    let m = trimmed.match(/^(n|i|v)?(nore)?map\s+(\S+)\s+(\S+)$/);
+    if (m) {
+      const ctx = m[1] ? VIMRC_CTX[m[1]] : undefined;
+      try {
+        if (m[2]) Vim.noremap(m[3], m[4], ctx);
+        else Vim.map(m[3], m[4], ctx);
+      } catch (e) {
+        console.error("[SS Ext] vimrc: failed to apply mapping:", trimmed, e);
+      }
+      return;
+    }
+
+    m = trimmed.match(/^(n|i|v)?unmap\s+(\S+)$/);
+    if (m) {
+      const ctx = m[1] ? VIMRC_CTX[m[1]] : undefined;
+      try {
+        Vim.unmap(m[2], ctx);
+      } catch (e) {
+        console.error("[SS Ext] vimrc: failed to unmap:", trimmed, e);
+      }
+      return;
+    }
+
+    console.warn("[SS Ext] vimrc: unsupported line:", trimmed);
+  }
+
+  function applyVimrcToSnippetsEditor(text) {
+    ace.config.loadModule("ace/keyboard/vim", (vim) => {
+      const Vim = vim && vim.Vim;
+      if (!Vim) return;
+      (text || "").split("\n").forEach((line) => applyVimrcLine(Vim, line));
+    });
+  }
+
+  let applying = false; // re-entrancy guard: our own storage.local.set shouldn't bounce back into itself
+
+  async function initEditorConfig() {
+    const themes = ace.require("ace/ext/themelist").themes;
+    const darkSelect = document.getElementById("ace-dark-theme");
+    const lightSelect = document.getElementById("ace-light-theme");
+    const vimrcEditor = document.getElementById("vimrc-editor");
+
+    themes.forEach((t) => {
+      darkSelect.appendChild(new Option(t.caption, t.theme));
+      lightSelect.appendChild(new Option(t.caption, t.theme));
+    });
+
+    const snippetsEditor = ace.edit("snippets-editor");
+    snippetsEditor.session.setMode("ace/mode/snippets");
+
+    // OS dark/light still picks which of the pair is shown, matching the main
+    // editor's own matchMedia machinery (editor-swap.js).
+    const darkMql = window.matchMedia("(prefers-color-scheme: dark)");
+    let current = mergeAceConfig(null);
+
+    function applyToSnippetsEditor() {
+      snippetsEditor.setTheme(darkMql.matches ? current.darkTheme : current.lightTheme);
+      snippetsEditor.setOptions(current.options);
+    }
+
+    function renderSelects() {
+      darkSelect.value = current.darkTheme;
+      lightSelect.value = current.lightTheme;
+      vimrcEditor.value = current.vimrc || "";
+    }
+
+    async function persist() {
+      applying = true;
+      await chrome.storage.local.set({ aceConfig: current });
+      applying = false;
+    }
+
+    const { aceConfig } = await chrome.storage.local.get("aceConfig");
+    current = mergeAceConfig(aceConfig);
+    renderSelects();
+    applyToSnippetsEditor();
+    applyVimrcToSnippetsEditor(current.vimrc);
+
+    darkMql.addEventListener("change", applyToSnippetsEditor);
+    darkSelect.addEventListener("change", () => {
+      current.darkTheme = darkSelect.value;
+      applyToSnippetsEditor();
+      persist();
+    });
+    lightSelect.addEventListener("change", () => {
+      current.lightTheme = lightSelect.value;
+      applyToSnippetsEditor();
+      persist();
+    });
+
+    const vimrcStatus = document.getElementById("vimrc-save-status");
+    document.getElementById("save-vimrc").addEventListener("click", () => {
+      current.vimrc = vimrcEditor.value;
+      applyVimrcToSnippetsEditor(current.vimrc);
+      persist();
+      vimrcStatus.textContent = "Saved.";
+      setTimeout(() => (vimrcStatus.textContent = ""), 2000);
+    });
+
+    // Persist stock settings-menu (Ctrl-,) panel changes for the snippet editor
+    // too - same prototype-level hook as editor-swap.js's installSettingsMenuPersistence,
+    // patched once. ext-settings_menu.js is loaded via a <script> tag in
+    // options.html, so "ace/ext/options" is already registered by the time this runs.
+    if (!window.__ssfSettingsMenuPatched) {
+      window.__ssfSettingsMenuPatched = true;
+      try {
+        const OptionPanel = ace.require("ace/ext/options").OptionPanel;
+        const origSetOption = OptionPanel.prototype.setOption;
+        OptionPanel.prototype.setOption = function (option, value) {
+          origSetOption.call(this, option, value);
+          if (option.path === "theme" || option.path === "mode") return;
+          current.options[option.path] = value;
+          persist();
+        };
+      } catch (e) {
+        console.error("[SS Ext] Failed to hook settings menu persistence:", e);
+      }
+    }
+
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "local" || !changes.aceConfig || applying) return;
+      current = mergeAceConfig(changes.aceConfig.newValue);
+      renderSelects();
+      applyToSnippetsEditor();
+      applyVimrcToSnippetsEditor(current.vimrc);
+    });
+
+    return snippetsEditor;
+  }
+
   // -- Snippets ---------------------------------------------------------------------
 
-  async function initSnippets() {
-    const editor = ace.edit("snippets-editor");
-    editor.session.setMode("ace/mode/snippets");
-
-    // Follow OS dark/light, matching the main editor's theme pair (editor-swap.js).
-    const darkMql = window.matchMedia("(prefers-color-scheme: dark)");
-    const applyTheme = () => editor.setTheme(darkMql.matches ? "ace/theme/gruvbox" : "ace/theme/iplastic");
-    darkMql.addEventListener("change", applyTheme);
-    applyTheme();
-
+  async function initSnippets(editor) {
     const { snippets } = await chrome.storage.local.get("snippets");
     // Unset -> defaults; a saved value wins even when empty (user cleared).
     const text = snippets && typeof snippets.sas === "string" ? snippets.sas : window.DEFAULT_SAS_SNIPPETS || "";
@@ -143,5 +300,5 @@
 
   renderPatches();
   renderHotkeys();
-  initSnippets();
+  initEditorConfig().then(initSnippets);
 })();

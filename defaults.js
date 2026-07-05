@@ -42,3 +42,27 @@ snippet sqlpass
 		disconnect from dwh;
 	quit;
 `;
+
+/**
+ * Default Ace editor configuration - the "default for new editors" that the
+ * in-page settings panel and options.html both read/write via
+ * chrome.storage.local.aceConfig (see editor-swap.js/sw.js/options.js).
+ *
+ * darkTheme/lightTheme are the exception carved out in todo.md: they're only
+ * ever set from options.html (the settings panel's single "theme" knob can't
+ * express a light/dark pair, so panel changes to "theme" are ignored - see
+ * editor-swap.js's panel setOption listener). Everything else in `options` is
+ * a generic ace option-name -> value map applied via editor.setOptions(...),
+ * additive/overridable by whatever the panel or options page changes.
+ */
+var DEFAULT_ACE_CONFIG = {
+  darkTheme: "ace/theme/gruvbox",
+  lightTheme: "ace/theme/iplastic",
+  options: {
+    fontSize: 15,
+    keyboardHandler: "ace/keyboard/vim",
+    useSoftTabs: true,
+    tabSize: 4,
+  },
+  vimrc: "",
+};

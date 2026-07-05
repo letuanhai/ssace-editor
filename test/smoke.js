@@ -378,6 +378,7 @@ function check(name, ok, detail) {
         // entries display description text now, not command ids
         hasKnownAceCommand: list.some((c) => c.command === "find" || c.command === "gotoline"),
         displaysDescriptionText: list.some((c) => c.command === "find" && c.value !== "find"),
+        hasNoCustomPrefsEntry: !list.some((c) => c.value === "SS-Ext: Editor preferences"),
       };
     }, paletteNoFocusState.count);
     check("command palette (editor focused) shows overlay", paletteWithFocusState.overlayPresent, paletteWithFocusState);
@@ -388,9 +389,110 @@ function check(name, ok, detail) {
         paletteWithFocusState.displaysDescriptionText,
       paletteWithFocusState,
     );
+    check(
+      "command palette has no custom 'SS-Ext: Editor preferences' entry (removed)",
+      paletteWithFocusState.hasNoCustomPrefsEntry,
+      paletteWithFocusState,
+    );
     await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27 })));
     await page.waitForTimeout(300);
   }
+
+  // -- Persistent Ace editor configuration -----------------------------------------
+  // (a) a freshly-constructed adapter picks up whatever's seeded on ssExt.aceConfig
+  // (mirrors sw.js's onUpdated seed) - probed directly against a scratch div rather
+  // than round-tripping deactivate()/activate() on real SAS Studio tabs, which would
+  // reuse the same container id ace.edit() caches an editor instance against.
+  const seededTabSize = await page.evaluate(() => {
+    window.__ssExt.aceConfig = {
+      darkTheme: "ace/theme/gruvbox",
+      lightTheme: "ace/theme/iplastic",
+      options: { fontSize: 15, keyboardHandler: "ace/keyboard/vim", useSoftTabs: true, tabSize: 9 },
+    };
+    const div = document.createElement("div");
+    div.id = "ssext_smoke_config_probe";
+    document.body.appendChild(div);
+    const adapter = new window.__ssExt.AceEditorAdapter(div.id, "", "sas");
+    const tabSize = adapter.aceEditor.getOption("tabSize");
+    adapter.dispose();
+    div.remove();
+    return tabSize;
+  });
+  check("adapter picks up seeded aceConfig for a new editor", seededTabSize === 9, { seededTabSize });
+
+  // (b) applyAceConfig live-applies an option change to already-open adapters.
+  await page.evaluate(() => {
+    window.__ssExt.applyAceConfig({
+      darkTheme: "ace/theme/gruvbox",
+      lightTheme: "ace/theme/iplastic",
+      options: { fontSize: 15, keyboardHandler: "ace/keyboard/vim", useSoftTabs: true, tabSize: 12 },
+    });
+  });
+  const liveAppliedTabSize = await page.evaluate(() => {
+    const tabObj = window.appDMS.tabs.getAllTabObjects().find((t) => t.editor && t.editor.editor && t.editor.editor.aceEditor);
+    return tabObj ? tabObj.editor.editor.aceEditor.getOption("tabSize") : null;
+  });
+  check("applyAceConfig live-applies to already-open adapters", liveAppliedTabSize === 12, { liveAppliedTabSize });
+
+  // (c) the stock settings menu (Ctrl-,/showSettingsMenu, no custom panel anymore)
+  // opens for a focused editor via the real command, not a direct function call.
+  const focusedForPrefs = await page.evaluate(async () => {
+    const tabObj = window.appDMS.tabs.getAllTabObjects().find((t) => t.editor && t.editor.editor && t.editor.editor.aceEditor);
+    if (!tabObj) return false;
+    window.appDMS.tabs.selectTab(tabObj);
+    const aceEditor = tabObj.editor.editor.aceEditor;
+    aceEditor.focus();
+    await new Promise((r) => setTimeout(r, 100));
+    aceEditor.execCommand("showSettingsMenu");
+    return true;
+  });
+  await page.waitForTimeout(300);
+  const panelOpen = await page.evaluate(() => !!document.getElementById("ace_settingsmenu"));
+  check("stock settings menu opens for a focused editor (execCommand)", focusedForPrefs && panelOpen, { focusedForPrefs, panelOpen });
+
+  // (d) driving a real panel control (not calling setOption directly) persists to
+  // chrome.storage.local.aceConfig via the OptionPanel.prototype.setOption hook + relay.js.
+  let persistedAceConfig = null;
+  if (panelOpen) {
+    await page.evaluate(() => {
+      const input = document.querySelector('#ace_settingsmenu input[type="number"]');
+      input.value = "22";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await page.waitForTimeout(500);
+    persistedAceConfig = await sw.evaluate(async () => {
+      const { aceConfig } = await chrome.storage.local.get("aceConfig");
+      return aceConfig || null;
+    });
+  }
+  check(
+    "settings menu control change persists via relay.js to chrome.storage.local.aceConfig",
+    !!persistedAceConfig && persistedAceConfig.options && persistedAceConfig.options.fontSize === 22,
+    persistedAceConfig,
+  );
+  await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27 })));
+  await page.waitForTimeout(200);
+
+  // (e) vimrc: pushing a config with a vimrc string through applyAceConfig applies
+  // it against the (already-loaded, from the toggle above) vim module.
+  const vimrcApplied = await page.evaluate(async () => {
+    const before = window.__ssExt._vimrcApplied || 0;
+    window.__ssExt.applyAceConfig({
+      darkTheme: "ace/theme/gruvbox",
+      lightTheme: "ace/theme/iplastic",
+      options: { fontSize: 15, keyboardHandler: "ace/keyboard/vim", useSoftTabs: true, tabSize: 4 },
+      vimrc: "imap jj <Esc>",
+    });
+    for (let i = 0; i < 30; i++) {
+      if ((window.__ssExt._vimrcApplied || 0) > before) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return { applied: (window.__ssExt._vimrcApplied || 0) > before, lastText: window.__ssExt._vimrcLastText };
+  });
+  check("vimrc applies via applyAceConfig", vimrcApplied.applied && vimrcApplied.lastText === "imap jj <Esc>", vimrcApplied);
+
+  // Clean up storage state so reruns are deterministic.
+  await sw.evaluate(() => chrome.storage.local.remove("aceConfig"));
 
   const deactivated = await page.evaluate((lp) => window.__ssExt.toggle(lp), libPath);
   check("Ace editor replacement deactivates cleanly", deactivated && deactivated.active === false, deactivated);

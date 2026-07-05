@@ -47,36 +47,43 @@
       this.container.style.width = "100%";
       this.container.style.height = "100%";
 
-      const darkTheme = "ace/theme/gruvbox";
-      const lightTheme = "ace/theme/iplastic";
+      const cfg = getAceConfig();
+      this._darkTheme = cfg.darkTheme;
+      this._lightTheme = cfg.lightTheme;
       const isDarkMode =
         window.matchMedia &&
         window.matchMedia("(prefers-color-scheme: dark)").matches;
-      const editorTheme = isDarkMode ? darkTheme : lightTheme;
+      const editorTheme = isDarkMode ? this._darkTheme : this._lightTheme;
 
-      this.aceEditor = ace.edit(containerId, {
-        mode: "ace/mode/sas",
-        keyboardHandler: "ace/keyboard/vim",
-        theme: editorTheme,
-        fontSize: 15,
-        showLineNumbers: true,
-        showGutter: true,
-        displayIndentGuides: true,
-        behavioursEnabled: true,
-        autoScrollEditorIntoView: true,
-        enableBasicAutocompletion: true,
-        enableLiveAutocompletion: true,
-        enableSnippets: true,
-        tooltipFollowsMouse: true,
-        highlightActiveLine: true,
-        highlightIndentGuides: true,
-        highlightSelectedWord: true,
-      });
+      this.aceEditor = ace.edit(
+        containerId,
+        Object.assign(
+          {
+            mode: "ace/mode/sas",
+            theme: editorTheme,
+            showLineNumbers: true,
+            showGutter: true,
+            displayIndentGuides: true,
+            behavioursEnabled: true,
+            autoScrollEditorIntoView: true,
+            enableBasicAutocompletion: true,
+            enableLiveAutocompletion: true,
+            enableSnippets: true,
+            tooltipFollowsMouse: true,
+            highlightActiveLine: true,
+            highlightIndentGuides: true,
+            highlightSelectedWord: true,
+          },
+          cfg.options,
+        ),
+      );
 
       // Watch for OS dark-mode changes; handler + mql kept for dispose() cleanup.
+      // Reads this._darkTheme/this._lightTheme live (not the cfg captured above)
+      // so an options-page theme-pair change still takes effect on the next flip.
       this._darkModeMql = window.matchMedia("(prefers-color-scheme: dark)");
       this._darkModeHandler = (event) => {
-        this.aceEditor.setTheme(event.matches ? darkTheme : lightTheme);
+        this.aceEditor.setTheme(event.matches ? this._darkTheme : this._lightTheme);
       };
       this._darkModeMql.addEventListener("change", this._darkModeHandler);
 
@@ -254,6 +261,15 @@
       return this.aceEditor.getReadOnly();
     }
 
+    // Live-apply a { darkTheme, lightTheme, options } config (ssExt.applyAceConfig).
+    applyConfig(cfg) {
+      this._darkTheme = cfg.darkTheme;
+      this._lightTheme = cfg.lightTheme;
+      const isDarkMode = this._darkModeMql && this._darkModeMql.matches;
+      this.aceEditor.setTheme(isDarkMode ? cfg.darkTheme : cfg.lightTheme);
+      this.aceEditor.setOptions(cfg.options);
+    }
+
     // -- Layout ------------------------------------------------------------------
     resize() {
       this.aceEditor.resize();
@@ -338,6 +354,7 @@
     _userSnippetsParsed: null, // previously-registered parsed snippets, for unregister
     _textViewers: [], // live { pane, tabHolder, adapter, item, textarea, origSet, origResize, editable, dirty, buttons } entries
     libPath: null, // stashed by loadNewAce() so the palette's editor-toggle command can call toggle(ssExt.libPath)
+    aceConfig: null, // seeded by sw.js (tabs.onUpdated) and refreshed by applyAceConfig()
     activate,
     deactivate,
     toggle,
@@ -345,8 +362,55 @@
     browse,
     commandPalette,
     applySnippets,
+    applyAceConfig,
+    AceEditorAdapter, // exposed mainly for test/debug (smoke.js probes config seeding directly)
   };
   window.__ssExt = ssExt;
+
+  // -- Ace editor configuration (theme pair + generic ace options) --------------
+  // Fallback mirrors defaults.js's DEFAULT_ACE_CONFIG for the (normally brief)
+  // window before sw.js's onUpdated seed sets ssExt.aceConfig - MAIN-world code
+  // can't importScripts/load defaults.js itself.
+  function getAceConfig() {
+    const cfg = ssExt.aceConfig || {};
+    return {
+      darkTheme: cfg.darkTheme || "ace/theme/gruvbox",
+      lightTheme: cfg.lightTheme || "ace/theme/iplastic",
+      options: Object.assign(
+        { fontSize: 15, keyboardHandler: "ace/keyboard/vim", useSoftTabs: true, tabSize: 4 },
+        cfg.options || {},
+      ),
+    };
+  }
+
+  // Called by sw.js's storage.onChanged listener (aceConfig key) and by the
+  // settings-menu persistence hook (installSettingsMenuPersistence, below).
+  // Stores the config and live-applies it to every open adapter.
+  function applyAceConfig(config) {
+    ssExt.aceConfig = config;
+    if (!ssExt.newAceLoaded) return; // nothing open yet to apply to
+
+    const cfg = getAceConfig();
+    const adapters = ssExt._textViewers.map((e) => e.adapter).filter(Boolean);
+    if (typeof appDMS !== "undefined" && appDMS.tabs && appDMS.tabs.getAllTabObjects) {
+      appDMS.tabs.getAllTabObjects().forEach((t) => {
+        const a = t.editor && t.editor.editor;
+        if (a && a._isAceEditorAdapter) adapters.push(a);
+      });
+    }
+    adapters.forEach((a) => {
+      try {
+        a.applyConfig(cfg);
+      } catch (e) {
+        console.error("[SS Ext] applyAceConfig: failed to apply to an editor:", e);
+      }
+    });
+
+    // Removed mappings from an earlier vimrc keep applying until page reload
+    // (Vim has no "reset to defaults" - only explicit unmap of what we know about).
+    const vimrcText = config.vimrc || "";
+    if (vimrcText !== ssExt._vimrcLastText) applyVimrcConfig(vimrcText);
+  }
 
   // -- Ace library management ---------------------------------------------------
   // The original ace build's #ace_editor.css/#ace-tm style elements are inert:
@@ -390,11 +454,14 @@
     await loadScript(`${libPath}/ace.js`);
     if (window.ace && window.ace.config) {
       window.ace.config.set("basePath", libPath);
-      // This build resolves "ace/keyboard/vim" to keyboard-vim.js, but the bundled
-      // file is keybinding-vim.js - without this override vim mode (and its :w/:q
-      // ex-commands) 404s and silently never loads. The adapter requests vim as its
-      // keyboardHandler, so fix the URL before any editor is created.
-      window.ace.config.setModuleUrl("ace/keyboard/vim", `${libPath}/keybinding-vim.js`);
+      // This build resolves "ace/keyboard/<name>" to keyboard-<name>.js, but the
+      // bundled files are keybinding-<name>.js - without this override a
+      // non-default keyboardHandler (vim, emacs, sublime, vscode - all
+      // user-selectable from the options page/settings panel) 404s and silently
+      // never loads. Fix the URLs before any editor is created.
+      ["vim", "emacs", "sublime", "vscode"].forEach((name) => {
+        window.ace.config.setModuleUrl(`ace/keyboard/${name}`, `${libPath}/keybinding-${name}.js`);
+      });
     }
     // Note: the src-noconflict build only ever assigns window.ace - its internal
     // require/define are closure-local, so window.require/window.define (Dojo's
@@ -405,10 +472,16 @@
     await loadScript(`${libPath}/ext-language_tools.js`);
     await loadScript(`${libPath}/ext-browse_ss.js`);
     await loadScript(`${libPath}/ext-prompt.js`);
+    // Bundles its own copy of ace/ext/options (OptionPanel) - the stock
+    // Ctrl-,/showSettingsMenu panel. Eagerly loading it here means ace core's
+    // lazy config.loadModule("ace/ext/settings_menu", ...) in the showSettingsMenu
+    // command is a no-op (module id already registered), not a second HTTP load.
+    await loadScript(`${libPath}/ext-settings_menu.js`);
 
     ssExt.newLib = { ace: window.ace };
     ssExt.newAceLoaded = true;
 
+    installSettingsMenuPersistence();
     // Register vim :w/:q/:wq/:x once the new ace (and its vim module) is available.
     installVimExCommands();
 
@@ -839,6 +912,11 @@
       Vim.defineEx("quit", "q", (cm) => vimClose(resolveAceContext(cm.ace)));
       Vim.defineEx("wq", "wq", saveAndClose);
       Vim.defineEx("xit", "x", saveAndClose);
+
+      const vimrcText = (ssExt.aceConfig && ssExt.aceConfig.vimrc) || "";
+      vimrcText.split("\n").forEach((line) => applyVimrcLine(Vim, line));
+      ssExt._vimrcApplied = (ssExt._vimrcApplied || 0) + 1;
+      ssExt._vimrcLastText = vimrcText;
     });
   }
 
@@ -1060,6 +1138,86 @@
     }
 
     return null;
+  }
+
+  // -- Stock Ace settings panel (Ctrl-,/showSettingsMenu) persistence ------------
+  // ext-settings_menu.js bundles its own "ace/ext/options" module (OptionPanel) -
+  // that's the one showSettingsMenu's exec actually instantiates, so patching
+  // this module's prototype (rather than a separately-loaded ext-options.js copy)
+  // is what the stock panel is guaranteed to go through. Every user change funnels
+  // through OptionPanel.prototype.setOption, which already _signal("setOption")s
+  // after running - patch once, after the original, and persist as the default
+  // for new editors (live-applied to open ones too). Theme/mode are skipped: the
+  // dark/light pair is options-page-only (the panel's single "theme" knob can't
+  // express a pair), and "mode" isn't part of the persisted config at all.
+  function installSettingsMenuPersistence() {
+    if (ssExt._settingsMenuPatched) return;
+    ssExt._settingsMenuPatched = true;
+    try {
+      const OptionPanel = ssExt.newLib.ace.require("ace/ext/options").OptionPanel;
+      const origSetOption = OptionPanel.prototype.setOption;
+      OptionPanel.prototype.setOption = function (option, value) {
+        origSetOption.call(this, option, value);
+        if (option.path === "theme" || option.path === "mode") return;
+        const cfg = getAceConfig();
+        cfg.options[option.path] = value;
+        applyAceConfig(cfg);
+        window.postMessage({ __ssextAceConfig: cfg }, "*");
+      };
+    } catch (e) {
+      console.error("[SS Ext] Failed to hook settings menu persistence:", e);
+    }
+  }
+
+  // -- vimrc: a small subset of vim-config lines applied to the shared Vim module -
+  // one mapping per line, `"` comments, blank lines skipped. Unsupported syntax
+  // just warns and moves on - one bad line shouldn't break the rest.
+  //   map/nmap/imap/vmap <lhs> <rhs>        -> Vim.map(lhs, rhs, ctx)
+  //   noremap/nnoremap/inoremap/vnoremap    -> Vim.noremap(lhs, rhs, ctx)
+  //   unmap/nunmap/iunmap/vunmap <lhs>      -> Vim.unmap(lhs, ctx)
+  const VIMRC_CTX = { n: "normal", i: "insert", v: "visual" };
+
+  function applyVimrcLine(Vim, line) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.charAt(0) === '"') return;
+
+    let m = trimmed.match(/^(n|i|v)?(nore)?map\s+(\S+)\s+(\S+)$/);
+    if (m) {
+      const ctx = m[1] ? VIMRC_CTX[m[1]] : undefined;
+      try {
+        if (m[2]) Vim.noremap(m[3], m[4], ctx);
+        else Vim.map(m[3], m[4], ctx);
+      } catch (e) {
+        console.error("[SS Ext] vimrc: failed to apply mapping:", trimmed, e);
+      }
+      return;
+    }
+
+    m = trimmed.match(/^(n|i|v)?unmap\s+(\S+)$/);
+    if (m) {
+      const ctx = m[1] ? VIMRC_CTX[m[1]] : undefined;
+      try {
+        Vim.unmap(m[2], ctx);
+      } catch (e) {
+        console.error("[SS Ext] vimrc: failed to unmap:", trimmed, e);
+      }
+      return;
+    }
+
+    console.warn("[SS Ext] vimrc: unsupported line:", trimmed);
+  }
+
+  // Applies once the vim module is actually loaded/available; a counter (not
+  // just a flag) so smoke tests can see a re-apply happened.
+  function applyVimrcConfig(text) {
+    if (!ssExt.newAceLoaded) return;
+    ssExt.newLib.ace.config.loadModule("ace/keyboard/vim", (vim) => {
+      const Vim = vim && vim.Vim;
+      if (!Vim) return;
+      (text || "").split("\n").forEach((line) => applyVimrcLine(Vim, line));
+      ssExt._vimrcApplied = (ssExt._vimrcApplied || 0) + 1;
+      ssExt._vimrcLastText = text || "";
+    });
   }
 
   // -- Command palette (built on ace/ext/prompt's generic prompt()) -------------
