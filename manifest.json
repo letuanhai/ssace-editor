@@ -15,7 +15,7 @@
   ],
   "action": {
     "default_title": "SS Ext",
-    "default_popup": "popup.html"
+    "default_popup": "src/popup.html"
   },
   "commands": {
     "toggle_editor": {
@@ -47,12 +47,12 @@
     }
   },
   "background": {
-    "service_worker": "sw.js"
+    "service_worker": "src/sw.js"
   },
   "content_scripts": [
     {
       "matches": ["*://*/SASStudio/*"],
-      "js": ["relay.js"],
+      "js": ["src/relay.js"],
       "run_at": "document_start"
     }
   ],
@@ -60,7 +60,7 @@
     "*://*/SASStudio/*"
   ],
   "options_ui": {
-    "page": "options.html",
+    "page": "src/options.html",
     "open_in_tab": true
   },
   "web_accessible_resources": [

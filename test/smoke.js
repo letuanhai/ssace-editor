@@ -132,7 +132,7 @@ function check(name, ok, detail) {
   const extId = sw.url().split("/")[2]; // chrome-extension://<id>/sw.js
   const libPath = `chrome-extension://${extId}/lib/ace/src-noconflict`;
 
-  await page.addScriptTag({ path: require("path").join(EXT, "editor-swap.js") });
+  await page.addScriptTag({ path: require("path").join(EXT, "src", "editor-swap.js") });
   const activated = await page.evaluate((lp) => window.__ssExt.toggle(lp), libPath);
   check("Ace editor replacement activates", activated && activated.active === true, activated);
 

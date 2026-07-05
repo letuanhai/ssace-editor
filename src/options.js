@@ -125,9 +125,9 @@
   // Ace resolves "ace/keyboard/<name>" to keyboard-<name>.js by default, but the
   // vendored files are keybinding-<name>.js - same override as editor-swap.js's
   // loadNewAce, needed before any handler other than "" (Ace/none) can load.
-  ace.config.set("basePath", "lib/ace/src-noconflict");
+  ace.config.set("basePath", "../lib/ace/src-noconflict");
   ["vim", "emacs", "sublime", "vscode"].forEach((name) => {
-    ace.config.setModuleUrl(`ace/keyboard/${name}`, `lib/ace/src-noconflict/keybinding-${name}.js`);
+    ace.config.setModuleUrl(`ace/keyboard/${name}`, `../lib/ace/src-noconflict/keybinding-${name}.js`);
   });
 
   function mergeAceConfig(stored) {

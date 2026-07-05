@@ -150,7 +150,13 @@ every open SAS Studio tab immediately (no reload needed) via a
 
 ## Files
 
-- `manifest.json`, `sw.js` — extension config + service worker (editor toggle,
+The repo root is the extension root (the directory you load unpacked):
+`manifest.json` at the root, source files under `src/`, `assets/` and `lib/`
+at the root. `./package.sh` zips `manifest.json src assets lib` into
+`dist/sas-studio-ext-<version>.zip` for publishing, leaving out everything
+development-only (docs, `test/`, extracted app source). Within the runtime tree:
+
+- `manifest.json`, `src/sw.js` — extension config + service worker (editor toggle,
   ss-fixes injection, live snippet apply, live ace-config apply)
 - `relay.js` — ISOLATED-world content script; the only bridge from the
   in-page settings panel (MAIN world) to `chrome.storage.local.aceConfig`
