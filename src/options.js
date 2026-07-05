@@ -12,6 +12,7 @@
   function hotkeyLabel(hotkey) {
     if (!hotkey || !hotkey.key) return "(unbound)";
     let name = hotkey.key;
+    name = (hotkey.shiftKey ? "Shift+" : "") + name;
     name = (hotkey.altKey ? "Alt+" : "") + name;
     name = (hotkey.metaKey ? "Meta+" : "") + name;
     name = (hotkey.ctrlKey ? "Ctrl+" : "") + name;
@@ -108,6 +109,7 @@
             altKey: event.altKey,
             ctrlKey: event.ctrlKey,
             metaKey: event.metaKey,
+            shiftKey: event.shiftKey,
           };
           saveHotkey(keymap);
         }

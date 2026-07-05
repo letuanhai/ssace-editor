@@ -64,7 +64,8 @@
           String(event.key).toLowerCase() !== String(keyMap.key).toLowerCase() ||
           Boolean(keyMap.altKey) !== event.altKey ||
           Boolean(keyMap.ctrlKey) !== event.ctrlKey ||
-          Boolean(keyMap.metaKey) !== event.metaKey
+          Boolean(keyMap.metaKey) !== event.metaKey ||
+          Boolean(keyMap.shiftKey) !== event.shiftKey
         )
           return;
         event.preventDefault();

@@ -95,14 +95,14 @@ Add a prefix to the path for different option:
       kind: "action",
       label: "Next tab",
       title: "Select the next tab",
-      hotkey: { key: "}", altKey: true },
+      hotkey: { key: "}", altKey: true, shiftKey: true },
     },
     {
       name: "selectPreviousTab",
       kind: "action",
       label: "Previous tab",
       title: "Select the previous tab",
-      hotkey: { key: "{", altKey: true },
+      hotkey: { key: "{", altKey: true, shiftKey: true },
     },
     {
       name: "copyCurrentTabUri",
@@ -116,7 +116,7 @@ Add a prefix to the path for different option:
       kind: "action",
       label: "Reset layout current tab",
       title: "Move all panes within current tab back to the main pane container",
-      hotkey: { key: "|", altKey: true },
+      hotkey: { key: "|", altKey: true, shiftKey: true },
     },
     {
       name: "resetLayoutAllTabs",
@@ -150,11 +150,10 @@ Add a prefix to the path for different option:
       name: "commandPalette",
       kind: "action",
       label: "Command palette",
-      // event.key for Alt+Shift+P is "P" (uppercase) - the case-insensitive
-      // bindKey match means plain Alt+P also triggers this, same as other
-      // shifted-char hotkeys above (e.g. "}", "{", "|").
+      // event.key for Alt+Shift+P is "P" (uppercase); shiftKey is matched
+      // explicitly so this is Alt+Shift+P, distinct from a plain Alt+P.
       title: "Open the SS-Ext command palette",
-      hotkey: { key: "P", altKey: true },
+      hotkey: { key: "P", altKey: true, shiftKey: true },
     },
 
     // -- Patches - passive behavior changes, applied once at init ----------------
