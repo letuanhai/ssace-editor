@@ -25,21 +25,12 @@
       "description": "Toggle the Ace editor"
     },
     "browse_files": {
-      "suggested_key": {
-        "default": "Alt+P"
-      },
       "description": "Browse SAS Studio files"
     },
     "browse_library": {
-      "suggested_key": {
-        "default": "Alt+O"
-      },
       "description": "Browse SAS Studio library items"
     },
     "browse_tabs": {
-      "suggested_key": {
-        "default": "Alt+T"
-      },
       "description": "Select SAS Studio tabs"
     },
     "command_palette": {

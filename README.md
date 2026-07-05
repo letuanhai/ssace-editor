@@ -115,9 +115,12 @@ Clicking the toolbar button injects `editor-swap.js` into the page's MAIN world
 
 ## Browsing
 
-`window.__ssExt.browse(kind, libPath, snippetsText)` (used for browse_ss prompts)
-only loads the new Ace library if needed — it does not activate the editor
-replacement, so browse prompts work even while the built-in editor is still in use.
+The file/library/tab browsers are `ss-fixes.js` actions (`browseFiles` /
+`browseLibrary` / `browseTabs`, default **Alt+P** / **Alt+O** / **Alt+T**) —
+rebindable in the options page like any other action, and listed as
+`SS-Ext: Browse …` entries in the command palette. The `browse_files` /
+`browse_library` / `browse_tabs` chrome commands remain as unbound alternatives
+(assignable at `chrome://extensions/shortcuts`).
 
 Once a browse prompt is open, these keys act on the selected entry (a compact
 legend is also shown at the bottom of the prompt):
@@ -135,6 +138,10 @@ legend is also shown at the bottom of the prompt):
 | `Alt+C` | Copy the item's name |
 | `Alt+Ctrl+C` | Copy the item's full path |
 | `↑` `↓` `PgUp` `PgDn` `Ctrl+↑`/`Home` `Ctrl+↓`/`End` | Move the selection |
+
+Under the hood, `window.__ssExt.browse(kind, libPath, snippetsText)` only loads
+the new Ace library if needed — it does not activate the editor replacement, so
+browse prompts work even while the built-in editor is still in use.
 
 ## UX fixes and configuration
 

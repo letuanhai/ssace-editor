@@ -1084,11 +1084,15 @@
     return ssExt._pending;
   }
 
-  async function doBrowse(kind, libPath) {
+  async function doBrowse(kind) {
+    if (!ssExt.libPath) {
+      console.error("[SS Ext] browse: no libPath known yet - can't load the Ace library");
+      return { active: ssExt.active };
+    }
     // browse only needs the new ace lib loaded (its css stays attached
     // permanently once loaded) - it doesn't need activation of the editor
     // replacement itself. loadNewAce no-ops if already loaded.
-    await loadNewAce(libPath);
+    await loadNewAce(ssExt.libPath);
     applySnippets(ssExt.userSnippets);
     // Resolve through the NEW ace instance, not window.ace - the global is the
     // original library whenever the toggle is off.
@@ -1103,12 +1107,15 @@
   }
 
   function browse(kind, libPath, snippetsText) {
+    // libPath optional once ssExt.libPath is known (seeded by sw.js on page load),
+    // so the in-page browse hotkeys/palette entries can call browse(kind) no-arg.
+    if (libPath) ssExt.libPath = libPath;
     if (snippetsText !== undefined) ssExt.userSnippets = snippetsText;
     // Serialize through the same _pending chain as toggle() so browse can't
     // race a concurrent toggle/activation.
     ssExt._pending = (ssExt._pending || Promise.resolve()).then(
-      () => doBrowse(kind, libPath),
-      () => doBrowse(kind, libPath),
+      () => doBrowse(kind),
+      () => doBrowse(kind),
     );
     return ssExt._pending;
   }
@@ -1243,7 +1250,18 @@
   // editor.keyBinding.$handlers, dedupes by command name, concatenates keys
   // for a command bound in multiple handlers.
   function getEditorCommandsByName(editor) {
-    const excludeCommands = ["insertstring", "inserttext", "setIndentation", "paste"];
+    // browseSs* are added to every editor via ace default_commands (ext-browse_ss.js),
+    // but the palette already lists them globally as "SS-Ext: Browse ..." entries, so
+    // drop them from the per-editor command list to avoid duplication.
+    const excludeCommands = [
+      "insertstring",
+      "inserttext",
+      "setIndentation",
+      "paste",
+      "browseSsFiles",
+      "browseSsLibrary",
+      "browseSsTabs",
+    ];
     const commandMap = {};
     const commandsByName = [];
     (editor.keyBinding.$handlers || []).forEach((handler) => {

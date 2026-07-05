@@ -155,6 +155,27 @@ Add a prefix to the path for different option:
       title: "Open the SS-Ext command palette",
       hotkey: { key: "P", altKey: true, shiftKey: true },
     },
+    {
+      name: "browseFiles",
+      kind: "action",
+      label: "Browse files",
+      title: "Browse and open SAS Studio files",
+      hotkey: { key: "P", altKey: true },
+    },
+    {
+      name: "browseLibrary",
+      kind: "action",
+      label: "Browse library",
+      title: "Browse SAS Studio library items",
+      hotkey: { key: "O", altKey: true },
+    },
+    {
+      name: "browseTabs",
+      kind: "action",
+      label: "Browse tabs",
+      title: "Switch between open SAS Studio tabs",
+      hotkey: { key: "T", altKey: true },
+    },
 
     // -- Patches - passive behavior changes, applied once at init ----------------
     {

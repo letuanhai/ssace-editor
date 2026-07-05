@@ -335,16 +335,28 @@ function check(name, ok, detail) {
       overlayPresent: !!overlay,
       hasSsExtEntry: list.some((c) => c.value.startsWith("SS-Ext: ")),
       hasBareAceCommand: list.some((c) => !c.value.startsWith("SS-Ext: ")),
+      hasBrowseEntries: ["SS-Ext: Browse files", "SS-Ext: Browse library", "SS-Ext: Browse tabs"].every((v) =>
+        list.some((c) => c.value === v),
+      ),
       count: list.length,
     };
   });
   check("command palette (no focus) shows overlay", paletteNoFocusState.overlayPresent, paletteNoFocusState);
   check("command palette (no focus) lists SS-Ext entries", paletteNoFocusState.hasSsExtEntry, paletteNoFocusState);
   check("command palette (no focus) has no editor commands", !paletteNoFocusState.hasBareAceCommand, paletteNoFocusState);
+  check("command palette lists SS-Ext browse entries", paletteNoFocusState.hasBrowseEntries, paletteNoFocusState);
   await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27 })));
   await page.waitForTimeout(300);
   const paletteClosedAfterEsc = await page.evaluate(() => !document.querySelector(".ace_prompt_container"));
   check("command palette closes on Esc", paletteClosedAfterEsc, { paletteClosedAfterEsc });
+
+  // browseFiles action opens the browse_ss prompt (its own container).
+  await page.evaluate(() => window.__ssf.run("browseFiles"));
+  await page.waitForTimeout(600);
+  const browseOpened = await page.evaluate(() => !!document.querySelector(".ace_browse_ss_container"));
+  check("browseFiles action opens the file browser prompt", browseOpened, { browseOpened });
+  await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27 })));
+  await page.waitForTimeout(300);
 
   // With a code editor (an Ace instance) focused: editor commands should also
   // show up. Reuses any currently-open code tab rather than the (now-closed)
@@ -379,6 +391,10 @@ function check(name, ok, detail) {
         hasKnownAceCommand: list.some((c) => c.command === "find" || c.command === "gotoline"),
         displaysDescriptionText: list.some((c) => c.command === "find" && c.value !== "find"),
         hasNoCustomPrefsEntry: !list.some((c) => c.value === "SS-Ext: Editor preferences"),
+        // browseSs* editor commands are excluded (browsing is listed globally as SS-Ext entries)
+        hasNoEditorBrowseCmds: !list.some((c) =>
+          ["browseSsFiles", "browseSsLibrary", "browseSsTabs"].includes(c.command),
+        ),
       };
     }, paletteNoFocusState.count);
     check("command palette (editor focused) shows overlay", paletteWithFocusState.overlayPresent, paletteWithFocusState);
@@ -392,6 +408,11 @@ function check(name, ok, detail) {
     check(
       "command palette has no custom 'SS-Ext: Editor preferences' entry (removed)",
       paletteWithFocusState.hasNoCustomPrefsEntry,
+      paletteWithFocusState,
+    );
+    check(
+      "command palette (editor focused) excludes browseSs* editor commands",
+      paletteWithFocusState.hasNoEditorBrowseCmds,
       paletteWithFocusState,
     );
     await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27 })));

@@ -873,6 +873,18 @@ Add a prefix to the path for different option:
       // call just needs window.__ssExt to exist.
       fn: () => window.__ssExt && window.__ssExt.commandPalette && window.__ssExt.commandPalette(),
     },
+    // browse_ss prompts, same no-arg pattern as commandPalette (libPath already
+    // seeded on the pre-injected __ssExt). Also reachable via the (unbound) chrome
+    // commands in manifest.json and, when an editor is focused, the palette.
+    browseFiles: {
+      fn: () => window.__ssExt && window.__ssExt.browse && window.__ssExt.browse("files"),
+    },
+    browseLibrary: {
+      fn: () => window.__ssExt && window.__ssExt.browse && window.__ssExt.browse("library"),
+    },
+    browseTabs: {
+      fn: () => window.__ssExt && window.__ssExt.browse && window.__ssExt.browse("tabs"),
+    },
     toggleNativeMouse: {
       // Live "native mouse handling" toggle, no reload. When ON, a window-capture
       // handler stops PROPAGATION (never preventDefault) of the mouse-gesture
