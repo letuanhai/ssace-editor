@@ -119,6 +119,23 @@ Clicking the toolbar button injects `editor-swap.js` into the page's MAIN world
 only loads the new Ace library if needed — it does not activate the editor
 replacement, so browse prompts work even while the built-in editor is still in use.
 
+Once a browse prompt is open, these keys act on the selected entry (a compact
+legend is also shown at the bottom of the prompt):
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Open the selected item (file / table / tab) |
+| `Ctrl+Enter` | Open the selected file as text |
+| `Shift+Enter` | Reveal the selected item in the tree |
+| `Tab` | Fill the prompt with the selected item's name |
+| `Shift+Space` | Go to the parent directory |
+| `Ctrl+L` | Clear the prompt |
+| `Esc` | Drop the last path segment; close when already empty / at a folder |
+| `Shift+Esc` | Close the prompt |
+| `Alt+C` | Copy the item's name |
+| `Alt+Ctrl+C` | Copy the item's full path |
+| `↑` `↓` `PgUp` `PgDn` `Ctrl+↑`/`Home` `Ctrl+↓`/`End` | Move the selection |
+
 ## UX fixes and configuration
 
 `ss-fixes.js` (injected automatically on every SAS Studio page load) provides

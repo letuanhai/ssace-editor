@@ -48,7 +48,7 @@ snippet sqlpass
  * in-page settings panel and options.html both read/write via
  * chrome.storage.local.aceConfig (see editor-swap.js/sw.js/options.js).
  *
- * darkTheme/lightTheme are the exception carved out in todo.md: they're only
+ * darkTheme/lightTheme are the deliberate exception: they're only
  * ever set from options.html (the settings panel's single "theme" knob can't
  * express a light/dark pair, so panel changes to "theme" are ignored - see
  * editor-swap.js's panel setOption listener). Everything else in `options` is
