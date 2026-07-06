@@ -532,10 +532,6 @@ declare module "ace-builds-internal/mode/folding/ruby" {
     export const FoldMode: new () => import("ace-builds").Ace.Folding;
 }
 
-declare module "ace-builds-internal/mode/folding/sas" {
-    export const FoldMode: new () => import("ace-builds").Ace.Folding;
-}
-
 declare module "ace-builds-internal/mode/folding/sql" {
     export const FoldMode: new () => import("ace-builds").Ace.Folding;
 }
@@ -1391,14 +1387,6 @@ declare module "ace-builds/src-noconflict/mode-sac_highlight_rules" {
 }
 
 declare module "ace-builds/src-noconflict/mode-sac" {
-    export const Mode: new () => import("ace-builds").Ace.SyntaxMode;
-}
-
-declare module "ace-builds/src-noconflict/mode-sas_highlight_rules" {
-    export const SasHighlightRules: new () => import("ace-builds").Ace.HighlightRules;
-}
-
-declare module "ace-builds/src-noconflict/mode-sas" {
     export const Mode: new () => import("ace-builds").Ace.SyntaxMode;
 }
 

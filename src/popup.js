@@ -66,7 +66,7 @@
       const snippetsText = await getSnippetsText();
       const result = await injectAndRun(
         tab.id,
-        ["src/editor-swap.js"],
+        ["src/ace-patches.js", "src/editor-swap.js"],
         (path, snippets) => window.__ssExt.toggle(path, snippets),
         [libPath, snippetsText],
       );
@@ -82,7 +82,7 @@
     if (!tab || tab.id === undefined) return;
     try {
       const libPath = chrome.runtime.getURL(LIB_PATH);
-      await injectAndRun(tab.id, ["src/editor-swap.js"], (path) => window.__ssExt.commandPalette(path), [libPath]);
+      await injectAndRun(tab.id, ["src/ace-patches.js", "src/editor-swap.js"], (path) => window.__ssExt.commandPalette(path), [libPath]);
       window.close();
     } catch (e) {
       console.error("[SS Ext] popup command palette failed:", e);

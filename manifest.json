@@ -20,7 +20,7 @@
   "commands": {
     "toggle_editor": {
       "suggested_key": {
-        "default": "Alt+Period"
+        "default": "Ctrl+Period"
       },
       "description": "Toggle the Ace editor"
     },
@@ -57,7 +57,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "lib/*.js"
+        "lib/*.js",
+        "src/ace/*.js"
       ],
       "matches": [
         "<all_urls>"

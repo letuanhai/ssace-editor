@@ -111,6 +111,23 @@
       this.eventHandlers = { textChanged: [], selectionChanged: [], caretMoved: [] };
       this.setupAceEventBindings();
 
+      // Ace status bar (ace/ext/statusbar, format from the author's ace fork -
+      // see src/ace-patches.js) as a non-intrusive overlay pinned to the editor's
+      // bottom-right; pointer-events:none so it never blocks clicks. ext-statusbar
+      // is loaded by loadNewAce(); guard in case it isn't.
+      try {
+        const StatusBar = ace.require("ace/ext/statusbar").StatusBar;
+        this._statusEl = document.createElement("div");
+        this._statusEl.className = "ssf-ace-statusbar";
+        this._statusEl.style.cssText =
+          "position:absolute;right:6px;bottom:2px;z-index:9;opacity:0.65;pointer-events:none;white-space:nowrap;";
+        this._statusEl.style.fontSize = cssFontSize(cfg.options && cfg.options.fontSize);
+        this.container.appendChild(this._statusEl);
+        new StatusBar(this.aceEditor, this._statusEl);
+      } catch (e) {
+        console.error("[SS Ext] status bar unavailable:", e);
+      }
+
       setTimeout(() => this.aceEditor.resize(), 10);
 
       // Property DMSEditor sets directly (DMSEditor.js:4188).
@@ -268,6 +285,8 @@
       const isDarkMode = this._darkModeMql && this._darkModeMql.matches;
       this.aceEditor.setTheme(isDarkMode ? cfg.darkTheme : cfg.lightTheme);
       this.aceEditor.setOptions(cfg.options);
+      // Keep the status bar overlay's font in step with the editor's.
+      if (this._statusEl) this._statusEl.style.fontSize = cssFontSize(cfg.options && cfg.options.fontSize);
     }
 
     // -- Layout ------------------------------------------------------------------
@@ -367,6 +386,12 @@
   };
   window.__ssExt = ssExt;
 
+  // ace's fontSize option is a number (px) or a CSS string ("13px"/"11pt"); the
+  // status bar overlay wants a CSS font-size string either way.
+  function cssFontSize(fs) {
+    return typeof fs === "number" ? fs + "px" : fs || "";
+  }
+
   // -- Ace editor configuration (theme pair + generic ace options) --------------
   // Fallback mirrors defaults.js's DEFAULT_ACE_CONFIG for the (normally brief)
   // window before sw.js's onUpdated seed sets ssExt.aceConfig - MAIN-world code
@@ -451,6 +476,11 @@
     if (ssExt.newAceLoaded) return;
     backupOrigAce();
 
+    // lib/ace/ is pristine ace-builds@1.43.3 - the custom SAS mode/snippets and
+    // the browse_ss extension live under the extension root's src/ace/ instead
+    // (see src/ace-patches.js's header comment for the rest of this split).
+    const srcAcePath = libPath.replace(/\/lib\/ace\/src-noconflict$/, "/src/ace");
+
     await loadScript(`${libPath}/ace.js`);
     if (window.ace && window.ace.config) {
       window.ace.config.set("basePath", libPath);
@@ -462,6 +492,10 @@
       ["vim", "emacs", "sublime", "vscode"].forEach((name) => {
         window.ace.config.setModuleUrl(`ace/keyboard/${name}`, `${libPath}/keybinding-${name}.js`);
       });
+      // ace/mode/sas and ace/snippets/sas aren't in lib/ (see above) - point ace's
+      // lazy module loader at src/ace/ instead of the basePath default.
+      window.ace.config.setModuleUrl("ace/mode/sas", `${srcAcePath}/mode-sas.js`);
+      window.ace.config.setModuleUrl("ace/snippets/sas", `${srcAcePath}/snippets-sas.js`);
     }
     // Note: the src-noconflict build only ever assigns window.ace - its internal
     // require/define are closure-local, so window.require/window.define (Dojo's
@@ -470,8 +504,18 @@
     // here on - they're harmless since nothing in SAS Studio references .ace_*.
 
     await loadScript(`${libPath}/ext-language_tools.js`);
-    await loadScript(`${libPath}/ext-browse_ss.js`);
+    await loadScript(`${srcAcePath}/ext-browse_ss.js`);
     await loadScript(`${libPath}/ext-prompt.js`);
+    await loadScript(`${libPath}/ext-statusbar.js`);
+
+    // Re-apply the fork's source changes now that everything they patch
+    // (ace/autocomplete + ace/snippets from ext-language_tools, ace/ext/modelist
+    // from ext-prompt, ace/ext/statusbar from ext-statusbar - none are in ace.js
+    // core) has loaded. This MUST run before ext-settings_menu.js below: its
+    // bundled ace/ext/options snapshots modelist.modes at load time into the
+    // settings-menu Mode dropdown, so the SAS entry has to exist first.
+    if (window.__ssExtApplyAcePatches) window.__ssExtApplyAcePatches(window.ace);
+
     // Bundles its own copy of ace/ext/options (OptionPanel) - the stock
     // Ctrl-,/showSettingsMenu panel. Eagerly loading it here means ace core's
     // lazy config.loadModule("ace/ext/settings_menu", ...) in the showSettingsMenu

@@ -193,12 +193,20 @@ development-only (docs, `test/`, extracted app source). Within the runtime tree:
 - `popup.html`/`popup.js` — editor toggle, native-mouse toggle, command palette button
 - `options.html`/`options.js` — patch toggles, hotkey rebinding, editor config
   (theme pair, vim config), snippet editor
-- `lib/ace/src-noconflict/` — the newer Ace library; `ext-browse_ss.js` is
-  custom, everything else is stock Ace (don't hand-edit, including
-  `snippets/sas.js` — custom snippets live in `defaults.js`/storage now).
-  The command palette is built on the stock `ext-prompt.js` module, and the
-  settings menu is the stock `ext-settings_menu.js` module (bundles its own
-  `OptionPanel`, `overlayPage`, and `themelist`) — neither is custom.
+- `lib/ace/` — pristine upstream `ace-builds` 1.43.3 (byte-identical to the npm
+  package; don't hand-edit anything under here). The command palette is built
+  on the stock `ext-prompt.js` module, and the settings menu is the stock
+  `ext-settings_menu.js` module (bundles its own `OptionPanel`, `overlayPage`,
+  and `themelist`) — neither is custom.
+- `src/ace-patches.js` — reproduces at runtime the author's ace-fork source
+  changes (github.com/letuanhai/ace) so `lib/ace/` stays pristine: a theme-aware
+  scrollbar cursor + selection-range bars (`decorators`), vim-aware Esc
+  passthrough (`autocomplete`/`snippets`), a SAS `modelist` entry, and the
+  fork's 1-based `statusbar` format (the code editor shows a status bar overlay)
+- `src/ace-seed.js` — one-liner that applies the ace-patches on the options
+  page, ordered before the settings menu so its Mode list includes SAS
+- `src/ace/` — the custom (non-upstream) Ace files: `mode-sas.js`,
+  `snippets-sas.js`, `ext-browse_ss.js` (+ its `.d.ts`)
 - `SAS_EDITOR_API.md`, `sas-editor.d.ts`, `EDITOR_USAGE_MAP.md` — reference docs
   for the `SAS.Editor` API surface `AceEditorAdapter` implements
 

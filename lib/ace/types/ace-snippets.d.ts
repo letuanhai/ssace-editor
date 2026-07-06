@@ -318,14 +318,6 @@ declare module "ace-builds/src-noconflict/snippets-ruby" {
     export const snippetText: string;
     export const scope: "ruby";
 }
-declare module "ace-builds/src-noconflict/snippets-sas.snippets" {
-    const _exports: string;
-    export = _exports;
-}
-declare module "ace-builds/src-noconflict/snippets-sas" {
-    export const snippetText: string;
-    export const scope: "sas";
-}
 declare module "ace-builds/src-noconflict/snippets-sh.snippets" {
     const _exports: string;
     export = _exports;

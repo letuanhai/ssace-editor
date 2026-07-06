@@ -181,6 +181,13 @@
     <script src="../lib/ace/src-noconflict/ace.js"></script>
     <script src="../lib/ace/src-noconflict/mode-snippets.js"></script>
     <script src="../lib/ace/src-noconflict/ext-themelist.js"></script>
+    <!-- Register ace/ext/modelist and seed the SAS entry BEFORE ext-settings_menu:
+         its bundled ace/ext/options snapshots modelist.modes at load into the
+         settings-menu Mode dropdown, so SAS must exist first. -->
+    <script src="../lib/ace/src-noconflict/ext-modelist.js"></script>
+    <script src="../lib/ace/src-noconflict/ext-statusbar.js"></script>
+    <script src="ace-patches.js"></script>
+    <script src="ace-seed.js"></script>
     <script src="../lib/ace/src-noconflict/ext-settings_menu.js"></script>
     <script src="options.js"></script>
   </body>

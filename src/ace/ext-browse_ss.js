@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @typedef {import('../types/ext-browse_ss')}
+ * @typedef {import('./ext-browse_ss')}
  */
 
 

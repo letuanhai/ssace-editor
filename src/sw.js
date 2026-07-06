@@ -33,7 +33,7 @@ const LIB_PATH = "/lib/ace/src-noconflict";
 async function injectAndRun(tabId, func, args) {
   await chrome.scripting.executeScript({
     target: { tabId },
-    files: ["src/editor-swap.js"],
+    files: ["src/ace-patches.js", "src/editor-swap.js"],
     world: "MAIN",
   });
 
@@ -161,7 +161,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     const aceConfig = await getAceConfig();
     await chrome.scripting.executeScript({
       target: { tabId },
-      files: ["src/editor-swap.js"],
+      files: ["src/ace-patches.js", "src/editor-swap.js"],
       world: "MAIN",
     });
     await chrome.scripting.executeScript({

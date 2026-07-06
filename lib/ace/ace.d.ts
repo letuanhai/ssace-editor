@@ -319,34 +319,34 @@ declare module "ace-builds" {
             /**
              * Emitted when the document changes.
              */
-            "change": (delta: Delta, emitter: EditSession) => void;
+            "change": (delta: Delta) => void;
             /**
              * Emitted when the tab size changes, via [[EditSession.setTabSize]].
              */
-            "changeTabSize": (e: undefined, emitter: EditSession) => void;
+            "changeTabSize": () => void;
             /**
              * Emitted when the ability to overwrite text changes, via [[EditSession.setOverwrite]].
              */
-            "changeOverwrite": (overwrite: boolean, emitter: EditSession) => void;
+            "changeOverwrite": (overwrite: boolean) => void;
             /**
              * Emitted when the gutter changes, either by setting or removing breakpoints, or when the gutter decorations change.
              */
-            "changeBreakpoint": (e: {
+            "changeBreakpoint": (e?: {
                 row?: number;
                 breakpoint?: boolean;
-            }, emitter: EditSession) => void;
+            }) => void;
             /**
              * Emitted when a front marker changes.
              */
-            "changeFrontMarker": (e: undefined, emitter: EditSession) => void;
+            "changeFrontMarker": () => void;
             /**
              * Emitted when a back marker changes.
              */
-            "changeBackMarker": (e: undefined, emitter: EditSession) => void;
+            "changeBackMarker": () => void;
             /**
              * Emitted when an annotation changes, like through [[EditSession.setAnnotations]].
              */
-            "changeAnnotation": (e: {}, emitter: EditSession) => void;
+            "changeAnnotation": (e: {}) => void;
             /**
              * Emitted when a background tokenizer asynchronously processes new rows.
              */
@@ -355,51 +355,51 @@ declare module "ace-builds" {
                     first: number;
                     last: number;
                 };
-            }, emitter: EditSession) => void;
+            }) => void;
             /**
              * Emitted when the current mode changes.
              */
-            "changeMode": (e: any, emitter: EditSession) => void;
+            "changeMode": (e: any) => void;
             /**
              * Emitted when the wrap mode changes.
              */
-            "changeWrapMode": (e: any, emitter: EditSession) => void;
+            "changeWrapMode": (e: any) => void;
             /**
              * Emitted when the wrapping limit changes.
              */
-            "changeWrapLimit": (e: any, emitter: EditSession) => void;
+            "changeWrapLimit": (e: any) => void;
             /**
              * Emitted when a code fold is added or removed.
              */
-            "changeFold": (e: any, emitter: EditSession) => void;
+            "changeFold": (e: any, session?: EditSession) => void;
             /**
              * Emitted when the scroll top changes.
              * @param scrollTop The new scroll top value
              **/
-            "changeScrollTop": (scrollTop: number, emitter: EditSession) => void;
+            "changeScrollTop": (scrollTop: number) => void;
             /**
              * Emitted when the scroll left changes.
              * @param scrollLeft The new scroll left value
              **/
-            "changeScrollLeft": (scrollLeft: number, emitter: EditSession) => void;
+            "changeScrollLeft": (scrollLeft: number) => void;
             "changeEditor": (e: {
                 editor?: Editor;
                 oldEditor?: Editor;
-            }, emitter: EditSession) => void;
-            "changeSelection": (e: undefined, emitter: EditSession) => void;
-            "startOperation": (op: {
+            }) => void;
+            "changeSelection": () => void;
+            "startOperation": (op?: {
                 command?: {
                     name?: string;
                 };
                 args?: any;
-            }, emitter: EditSession) => void;
-            "endOperation": (op: any, emitter: EditSession) => void;
-            "beforeEndOperation": (e: undefined, emitter: EditSession) => void;
+            }) => void;
+            "endOperation": (op?: any) => void;
+            "beforeEndOperation": () => void;
         }
         interface EditorEvents {
-            "change": (delta: Delta, emitter: Editor) => void;
-            "changeSelection": (e: undefined, emitter: Editor) => void;
-            "input": (e: undefined, emitter: Editor) => void;
+            "change": (delta: Delta) => void;
+            "changeSelection": () => void;
+            "input": () => void;
             /**
              * Emitted whenever the [[EditSession]] changes.
              * @param e An object with two properties, `oldSession` and `session`, that represent the old and new [[EditSession]]s.
@@ -407,65 +407,65 @@ declare module "ace-builds" {
             "changeSession": (e: {
                 oldSession: EditSession;
                 session: EditSession;
-            }, emitter: Editor) => void;
-            "blur": (e: any, emitter: Editor) => void;
-            "mousedown": (e: MouseEvent, emitter: Editor) => void;
+            }) => void;
+            "blur": (e: any) => void;
+            "mousedown": (e: MouseEvent) => void;
             "mousemove": (e: MouseEvent & {
                 scrollTop?: any;
-            }, emitter: Editor) => void;
-            "changeStatus": (e: any, emitter: Editor) => void;
-            "keyboardActivity": (e: any, emitter: Editor) => void;
-            "mousewheel": (e: MouseEvent, emitter: Editor) => void;
-            "mouseup": (e: MouseEvent, emitter: Editor) => void;
-            "beforeEndOperation": (e: any, emitter: Editor) => void;
-            "nativecontextmenu": (e: any, emitter: Editor) => void;
-            "destroy": (e: any, emitter: Editor) => void;
-            "focus": (e: any, emitter: Editor) => void;
+            }, editor?: Editor) => void;
+            "changeStatus": (e: any) => void;
+            "keyboardActivity": (e: any) => void;
+            "mousewheel": (e: MouseEvent) => void;
+            "mouseup": (e: MouseEvent) => void;
+            "beforeEndOperation": (e: any) => void;
+            "nativecontextmenu": (e: any) => void;
+            "destroy": (e: any) => void;
+            "focus": (e?: any) => void;
             /**
              * Emitted when text is copied.
              * @param text The copied text
              **/
             "copy": (e: {
                 text: string;
-            }, emitter: Editor) => void;
+            }) => void;
             /**
              * Emitted when text is pasted.
              **/
             "paste": (e: {
                 text: string;
                 event?: ClipboardEvent;
-            }, emitter: Editor) => void;
+            }) => void;
             /**
              * Emitted when the selection style changes, via [[Editor.setSelectionStyle]].
              * @param data Contains one property, `data`, which indicates the new selection style
              **/
-            "changeSelectionStyle": (data: "fullLine" | "screenLine" | "text" | "line", emitter: Editor) => void;
+            "changeSelectionStyle": (data: "fullLine" | "screenLine" | "text" | "line") => void;
             "changeMode": (e: {
                 mode?: Ace.SyntaxMode;
                 oldMode?: Ace.SyntaxMode;
-            }, emitter: Editor) => void;
+            }) => void;
             //from searchbox extension
             "findSearchBox": (e: {
                 match: boolean;
-            }, emitter: Editor) => void;
+            }) => void;
             //from code_lens extension
-            "codeLensClick": (e: any, emitter: Editor) => void;
-            "select": (e: undefined, emitter: Editor) => void;
-            "gutterkeydown": (e: GutterKeyboardEvent, emitter: Editor) => void;
-            "gutterclick": (e: MouseEvent, emitter: Editor) => void;
-            "showGutterTooltip": (e: GutterTooltip, emitter: Editor) => void;
-            "hideGutterTooltip": (e: GutterTooltip, emitter: Editor) => void;
-            "compositionStart": (e: undefined, emitter: Editor) => void;
+            "codeLensClick": (e: any) => void;
+            "select": () => void;
+            "gutterkeydown": (e: GutterKeyboardEvent) => void;
+            "gutterclick": (e: MouseEvent) => void;
+            "showGutterTooltip": (e: GutterTooltip) => void;
+            "hideGutterTooltip": (e: GutterTooltip) => void;
+            "compositionStart": () => void;
         }
         interface AcePopupEvents {
-            "click": (e: MouseEvent, emitter: AcePopup) => void;
-            "dblclick": (e: MouseEvent, emitter: AcePopup) => void;
-            "tripleclick": (e: MouseEvent, emitter: AcePopup) => void;
-            "quadclick": (e: MouseEvent, emitter: AcePopup) => void;
-            "show": (e: undefined, emitter: AcePopup) => void;
-            "hide": (e: undefined, emitter: AcePopup) => void;
-            "select": (hide: boolean, emitter: AcePopup) => void;
-            "changeHoverMarker": (e: any, emitter: AcePopup) => void;
+            "click": (e: MouseEvent) => void;
+            "dblclick": (e: MouseEvent) => void;
+            "tripleclick": (e: MouseEvent) => void;
+            "quadclick": (e: MouseEvent) => void;
+            "show": () => void;
+            "hide": () => void;
+            "select": (hide: boolean) => void;
+            "changeHoverMarker": (e: any) => void;
         }
         interface DocumentEvents {
             /**
@@ -479,8 +479,8 @@ declare module "ace-builds" {
              *    * `lines`: the lines being removed
              *
              **/
-            "change": (e: Delta, emitter: Document) => void;
-            "changeNewLineMode": (e: undefined, emitter: Document) => void;
+            "change": (e: Delta) => void;
+            "changeNewLineMode": () => void;
         }
         interface AnchorEvents {
             /**
@@ -494,7 +494,7 @@ declare module "ace-builds" {
             "change": (e: {
                 old: Point;
                 value: Point;
-            }, emitter: Anchor) => void;
+            }) => void;
         }
         interface BackgroundTokenizerEvents {
             /**
@@ -506,57 +506,53 @@ declare module "ace-builds" {
                     first: number;
                     last: number;
                 };
-            }, emitter: import("ace-builds-internal/background_tokenizer").BackgroundTokenizer) => void;
+            }) => void;
         }
         interface SelectionEvents {
             /**
              * Emitted when the cursor position changes.
              **/
-            "changeCursor": (e: undefined, emitter: Selection) => void;
+            "changeCursor": () => void;
             /**
              * Emitted when the cursor selection changes.
              **/
-            "changeSelection": (e: undefined, emitter: Selection) => void;
+            "changeSelection": () => void;
         }
         interface MultiSelectionEvents extends SelectionEvents {
-            "multiSelect": (e: undefined, emitter: Selection) => void;
+            "multiSelect": () => void;
             "addRange": (e: {
                 range: Range;
-            }, emitter: Selection) => void;
+            }) => void;
             "removeRange": (e: {
                 ranges: Range[];
-            }, emitter: Selection) => void;
-            "singleSelect": (e: undefined, emitter: Selection) => void;
+            }) => void;
+            "singleSelect": () => void;
         }
         interface PlaceHolderEvents {
-            "cursorEnter": (e: any, emitter: import("ace-builds-internal/placeholder").PlaceHolder) => void;
-            "cursorLeave": (e: any, emitter: import("ace-builds-internal/placeholder").PlaceHolder) => void;
+            "cursorEnter": (e: any) => void;
+            "cursorLeave": (e: any) => void;
         }
         interface GutterEvents {
-            "changeGutterWidth": (width: number, emitter: import("ace-builds-internal/layer/gutter").Gutter) => void;
-            "afterRender": (e: undefined, emitter: import("ace-builds-internal/layer/gutter").Gutter) => void;
+            "changeGutterWidth": (width: number) => void;
+            "afterRender": () => void;
         }
         interface TextEvents {
-            "changeCharacterSize": (e: any, emitter: import("ace-builds-internal/layer/text").Text) => void;
+            "changeCharacterSize": (e: any) => void;
         }
         interface VirtualRendererEvents {
-            "afterRender": (e: any, emitter: VirtualRenderer) => void;
-            "beforeRender": (e: any, emitter: VirtualRenderer) => void;
+            "afterRender": (e?: any, renderer?: VirtualRenderer) => void;
+            "beforeRender": (e: any, renderer?: VirtualRenderer) => void;
             "themeLoaded": (e: {
                 theme: string | Theme;
-            }, emitter: VirtualRenderer) => void;
+            }) => void;
             "themeChange": (e: {
                 theme: string | Theme;
-            }, emitter: VirtualRenderer) => void;
-            "scrollbarVisibilityChanged": (e: undefined, emitter: VirtualRenderer) => void;
-            "changeCharacterSize": (e: any, emitter: VirtualRenderer) => void;
-            "resize": (e: any, emitter: VirtualRenderer) => void;
-            "autosize": (e: undefined, emitter: VirtualRenderer) => void;
+            }) => void;
+            "scrollbarVisibilityChanged": () => void;
+            "changeCharacterSize": (e: any) => void;
+            "resize": (e?: any) => void;
+            "autosize": () => void;
         }
-        type EmitParameters<T extends (...args: any[]) => any> = T extends (first: infer First, ...rest: any[]) => any ? [
-            First
-        ] : [
-            ];
         export class EventEmitter<T extends {
             [K in keyof T]: (...args: any[]) => any;
         }> {
@@ -770,7 +766,7 @@ declare module "ace-builds" {
             editor: Editor;
             command: Command;
             args: any[];
-        }, emitter: CommandManager) => void;
+        }) => void;
         interface CommandManagerEvents {
             "exec": execEventHandler;
             "afterExec": execEventHandler;
@@ -1026,9 +1022,9 @@ declare module "ace-builds" {
             selectionChanged?: boolean;
         }
         export interface CommandBarEvents {
-            "hide": (e: undefined, emitter: import("ace-builds/src-noconflict/ext-command_bar").CommandBarTooltip) => void;
-            "show": (e: undefined, emitter: import("ace-builds/src-noconflict/ext-command_bar").CommandBarTooltip) => void;
-            "alwaysShow": (e: boolean, emitter: import("ace-builds/src-noconflict/ext-command_bar").CommandBarTooltip) => void;
+            "hide": () => void;
+            "show": () => void;
+            "alwaysShow": (e: boolean) => void;
         }
         export interface FontMetricsEvents {
             "changeCharacterSize": (e: {
@@ -1036,18 +1032,18 @@ declare module "ace-builds" {
                     height: number;
                     width: number;
                 };
-            }, emitter: import("ace-builds-internal/layer/font_metrics").FontMetrics) => void;
+            }) => void;
         }
         export interface OptionPanelEvents {
             "setOption": (e: {
                 name: string;
                 value: any;
-            }, emitter: import("ace-builds/src-noconflict/ext-options").OptionPanel) => void;
+            }) => void;
         }
         export interface ScrollbarEvents {
             "scroll": (e: {
                 data: number;
-            }, emitter: ScrollBar) => void;
+            }) => void;
         }
         export interface TextInputAriaOptions {
             activeDescendant?: string;

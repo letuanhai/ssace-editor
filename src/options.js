@@ -203,6 +203,20 @@
     const snippetsEditor = ace.edit("snippets-editor");
     snippetsEditor.session.setMode("ace/mode/snippets");
 
+    // Ace status bar overlay (same as the SAS editors - see editor-swap.js),
+    // pinned to the snippet editor's bottom-right; font size tracks the config.
+    let statusEl;
+    try {
+      const StatusBar = ace.require("ace/ext/statusbar").StatusBar;
+      statusEl = document.createElement("div");
+      statusEl.style.cssText =
+        "position:absolute;right:6px;bottom:2px;z-index:9;opacity:0.65;pointer-events:none;white-space:nowrap;";
+      document.getElementById("snippets-editor").appendChild(statusEl);
+      new StatusBar(snippetsEditor, statusEl);
+    } catch (e) {
+      console.error("[SS Ext] snippet status bar unavailable:", e);
+    }
+
     // OS dark/light still picks which of the pair is shown, matching the main
     // editor's own matchMedia machinery (editor-swap.js).
     const darkMql = window.matchMedia("(prefers-color-scheme: dark)");
@@ -211,6 +225,8 @@
     function applyToSnippetsEditor() {
       snippetsEditor.setTheme(darkMql.matches ? current.darkTheme : current.lightTheme);
       snippetsEditor.setOptions(current.options);
+      const fs = current.options && current.options.fontSize;
+      if (statusEl && fs) statusEl.style.fontSize = typeof fs === "number" ? fs + "px" : fs;
     }
 
     function renderSelects() {
@@ -271,6 +287,9 @@
         console.error("[SS Ext] Failed to hook settings menu persistence:", e);
       }
     }
+
+    // (The ace-patches are applied by an inline <script> in options.html, before
+    // ext-settings_menu loads - see the comment there for why the ordering matters.)
 
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "local" || !changes.aceConfig || applying) return;
