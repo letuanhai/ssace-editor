@@ -30,6 +30,8 @@ ace.define("ace/mode/sas_highlight_rules",[], function(require, exports, module)
 "use strict";
 var oop = require("../lib/oop");
 var TextHighlightRules = require("./text_highlight_rules").TextHighlightRules;
+var PythonHighlightRules = require("./python_highlight_rules").PythonHighlightRules;
+var LuaHighlightRules = require("./lua_highlight_rules").LuaHighlightRules;
 var SasHighlightRules = function () {
     this.$rules = {
         start: [{
@@ -509,7 +511,47 @@ var SasHighlightRules = function () {
             }, {
                 include: "#procmeans"
             }, {
+                include: "#procpython"
+            }, {
+                include: "#proclua"
+            }, {
                 include: "#procgeneral"
+            }],
+        "#procpython": [{
+                token: "storage.type.function.sas",
+                regex: /\bpython\b/,
+                caseInsensitive: true,
+                push: [{
+                        token: "text",
+                        regex: /\b(?=run)\b/,
+                        caseInsensitive: true,
+                        next: "pop"
+                    }, {
+                        include: "#specialparser"
+                    }, {
+                        token: "keyword.control.sas",
+                        regex: /\bsubmit\b\s*;/,
+                        caseInsensitive: true,
+                        push: "python-start"
+                    }]
+            }],
+        "#proclua": [{
+                token: "storage.type.function.sas",
+                regex: /\blua\b/,
+                caseInsensitive: true,
+                push: [{
+                        token: "text",
+                        regex: /\b(?=run)\b/,
+                        caseInsensitive: true,
+                        next: "pop"
+                    }, {
+                        include: "#specialparser"
+                    }, {
+                        token: "keyword.control.sas",
+                        regex: /\bsubmit\b\s*;/,
+                        caseInsensitive: true,
+                        push: "lua-start"
+                    }]
             }],
         "#procgeneral": [{
                 include: "#specialparser"
@@ -3366,6 +3408,18 @@ var SasHighlightRules = function () {
                     }]
             }]
     };
+    this.embedRules(PythonHighlightRules, "python-", [{
+            token: "keyword.control.sas",
+            regex: /\bendsubmit\b\s*;/,
+            caseInsensitive: true,
+            next: "pop"
+        }]);
+    this.embedRules(LuaHighlightRules, "lua-", [{
+            token: "keyword.control.sas",
+            regex: /\bendsubmit\b\s*;/,
+            caseInsensitive: true,
+            next: "pop"
+        }]);
     this.normalizeRules();
 };
 SasHighlightRules.metaData = {

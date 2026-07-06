@@ -53,6 +53,7 @@ function mergeAceConfig(stored) {
     options: Object.assign({}, DEFAULT_ACE_CONFIG.options, stored.options || {}),
     // Unset -> default; a saved value wins even when empty (user cleared it).
     vimrc: typeof stored.vimrc === "string" ? stored.vimrc : DEFAULT_ACE_CONFIG.vimrc,
+    lsp: typeof stored.lsp === "boolean" ? stored.lsp : DEFAULT_ACE_CONFIG.lsp,
   };
 }
 

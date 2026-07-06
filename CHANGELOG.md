@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- SAS language server integration (Phase 4): `ace/mode/sas` editors get LSP-backed
+  completions, hover, diagnostics, and semantic highlighting via `ace-linters` and
+  the SAS language server (sassoftware/vscode-sas-extension) running in a web
+  worker, loaded through a blob-URL `importScripts` worker. On by default
+  (`aceConfig.lsp`, toggle in the options page); additive-only — no server bundle
+  built (`./build_lib.sh`) or a worker failure just logs a warning and
+  leaves the editor working as before. mode-sas.js gained embedded Python/Lua
+  highlighting for `PROC PYTHON`/`PROC LUA` `submit;...endsubmit;` blocks.
+
 ## 0.3
 
 - New file action (Alt+N / command palette): create a new SAS program, same as F4.

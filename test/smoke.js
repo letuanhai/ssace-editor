@@ -38,6 +38,25 @@ function check(name, ok, detail) {
   await page.waitForSelector(".dijitTreeNode", { timeout: 45000 });
   await page.waitForTimeout(3000);
 
+  // Dismiss the autosave-recovery dialog if present ("The autosave file ... is
+  // newer ..."). Smoke runs themselves cause it: they type into the code editor
+  // and then kill the browser without saving, so the next session starts with
+  // this modal up, which blocks the tab hit-test and eats Esc. Answer "No"
+  // (keep the server copy - the edits were test noise).
+  const dismissed = await page.evaluate(() => {
+    const dlg = [...document.querySelectorAll(".dijitDialog")].find(
+      (d) => d.offsetParent !== null && /autosave/i.test(d.textContent),
+    );
+    if (!dlg) return false;
+    const no = [...dlg.querySelectorAll("span,button")].find((b) => b.textContent.trim() === "No");
+    if (no) no.click();
+    return !!no;
+  });
+  if (dismissed) {
+    console.log("note: dismissed autosave-recovery dialog left by a previous run");
+    await page.waitForTimeout(1000);
+  }
+
   // -- injection + init ---------------------------------------------------------
   const state = await page.evaluate(() => ({
     initialized: !!(window.__ssf && window.__ssf._initialized),
@@ -135,6 +154,27 @@ function check(name, ok, detail) {
   await page.addScriptTag({ path: require("path").join(EXT, "src", "editor-swap.js") });
   const activated = await page.evaluate((lp) => window.__ssExt.toggle(lp), libPath);
   check("Ace editor replacement activates", activated && activated.active === true, activated);
+
+  // -- SAS language server (LSP) ---------------------------------------------------
+  // Activation above already swapped any open SAS tabs to Ace (ace/mode/sas
+  // triggers ensureLsp() from the adapter constructor) - poll for the worker/
+  // provider to come up rather than assume a fixed delay.
+  const lspState = await page.evaluate(async () => {
+    for (let i = 0; i < 40; i++) {
+      if (window.__ssExt._lspProvider && window.__ssExt._lspReady) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return {
+      hasProvider: !!window.__ssExt._lspProvider,
+      ready: window.__ssExt._lspReady === true,
+      failed: !!window.__ssExt._lspFailed,
+    };
+  });
+  check(
+    "LSP provider comes up and reports ready within 20s",
+    lspState.hasProvider && lspState.ready,
+    lspState,
+  );
 
   // Pick a real, non-empty file that isn't already open as a tab - opening an
   // already-open uri just re-focuses that tab instead of creating a viewer.

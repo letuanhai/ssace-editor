@@ -1,0 +1,159 @@
+diff --git i/server/src/browser/StubPythonProvider.ts w/server/src/browser/StubPythonProvider.ts
+new file mode 100644
+index 0000000..95f8f87
+--- /dev/null
++++ w/server/src/browser/StubPythonProvider.ts
+@@ -0,0 +1,75 @@
++// Copyright © 2024, SAS Institute Inc., Cary, NC, USA.  All Rights Reserved.
++// SPDX-License-Identifier: Apache-2.0
++import type { PyrightLanguageProvider } from "../python/PyrightLanguageProvider";
++
++// ponytail: no Python/pyright support in the browser build (would need the whole
++// pyright-internal bundle, ~7MB). Every method is a no-op; upgrade to a real
++// in-browser provider if PROC PYTHON support is ever needed in-browser.
++export class StubPythonProvider implements PyrightLanguageProvider {
++  setSasLspProvider(): void {}
++  initialize(): void {}
++  getClientCapabilities() {
++    return { hasVisualStudioExtensionsCapability: false };
++  }
++  onInitialized() {}
++  onShutdown() {}
++  addContentChange(): void {}
++  onDidOpenTextDocument() {}
++  onDidCloseTextDocument() {}
++  onDidChangeConfiguration() {}
++  onDidChangeWatchedFiles() {}
++  onHover() {
++    return null;
++  }
++  async onCompletion() {
++    return { isIncomplete: false, items: [] };
++  }
++  onCompletionResolve(completionItem: unknown) {
++    return completionItem;
++  }
++  onSignatureHelp() {
++    return null;
++  }
++  onDefinition() {
++    return null;
++  }
++  onDeclaration() {
++    return null;
++  }
++  onTypeDefinition() {
++    return null;
++  }
++  onReferences() {
++    return null;
++  }
++  onDocumentSymbol() {
++    return [];
++  }
++  onWorkspaceSymbol() {
++    return [];
++  }
++  onDocumentHighlight() {
++    return null;
++  }
++  onPrepareRenameRequest() {
++    return null;
++  }
++  onRenameRequest() {
++    return null;
++  }
++  onCallHierarchyPrepare() {
++    return null;
++  }
++  onCallHierarchyIncomingCalls() {
++    return [];
++  }
++  onCallHierarchyOutgoingCalls() {
++    return [];
++  }
++  onExecuteCommand() {
++    return null;
++  }
++  executeCodeAction() {
++    return null;
++  }
++}
+diff --git i/server/src/browser/server.ts w/server/src/browser/server.ts
+index 82f4a96..775a402 100644
+--- i/server/src/browser/server.ts
++++ w/server/src/browser/server.ts
+@@ -7,8 +7,8 @@ import {
+   createConnection,
+ } from "vscode-languageserver/browser";
+ 
+-import { PyrightLanguageProviderBrowser } from "../python/browser/PyrightLanguageProviderBrowser";
+ import { runServer } from "../server";
++import { StubPythonProvider } from "./StubPythonProvider";
+ 
+ /* browser specific setup code */
+ const messageReader = new BrowserMessageReader(self);
+@@ -16,4 +16,4 @@ const messageWriter = new BrowserMessageWriter(self);
+ 
+ const connection: Connection = createConnection(messageReader, messageWriter);
+ 
+-runServer(connection, new PyrightLanguageProviderBrowser(connection, 1));
++runServer(connection, new StubPythonProvider());
+diff --git i/server/src/python/PyrightLanguageProvider.ts w/server/src/python/PyrightLanguageProvider.ts
+index 1ef5541..4a602c0 100644
+--- i/server/src/python/PyrightLanguageProvider.ts
++++ w/server/src/python/PyrightLanguageProvider.ts
+@@ -1,8 +1,48 @@
+ // Copyright © 2024, SAS Institute Inc., Cary, NC, USA.  All Rights Reserved.
+ // SPDX-License-Identifier: Apache-2.0
+-import type { PyrightLanguageProviderBrowser } from "./browser/PyrightLanguageProviderBrowser";
+-import type { PyrightLanguageProviderNode } from "./node/PyrightLanguageProviderNode";
++// ponytail: structural interface instead of the pyright-importing union type, so
++// browser/StubPythonProvider.ts can implement it without pulling pyright into the
++// browser bundle. Loose (any) types are fine here; server.ts only needs shape.
++import type { CompletionList } from "vscode-languageserver";
+ 
+-export type PyrightLanguageProvider =
+-  | PyrightLanguageProviderNode
+-  | PyrightLanguageProviderBrowser;
++// eslint-disable-next-line @typescript-eslint/no-explicit-any
++export interface PyrightLanguageProvider {
++  setSasLspProvider(getLanguageService: any): void;
++  initialize(params: any, a: any[], b: any[]): void;
++  getClientCapabilities(): any;
++  onInitialized(): any;
++  onShutdown(token: any): any;
++  addContentChange(document: any): void;
++  onDidOpenTextDocument(params: any): any;
++  onDidCloseTextDocument(params: any): any;
++  onDidChangeConfiguration(params: any): any;
++  onDidChangeWatchedFiles(params: any): any;
++  onHover(params: any, token: any): any;
++  onCompletion(
++    params: any,
++    token: any,
++  ): Promise<CompletionList | null | undefined>;
++  onCompletionResolve(completionItem: any, token: any): any;
++  onSignatureHelp(params: any, token: any): any;
++  onDefinition(params: any, token: any): any;
++  onDeclaration(params: any, token: any): any;
++  onTypeDefinition(params: any, token: any): any;
++  onReferences(
++    params: any,
++    token: any,
++    workDoneReporter?: any,
++    resultReporter?: any,
++    createDocumentRange?: any,
++    convertToLocation?: any,
++  ): any;
++  onDocumentSymbol(params: any, token: any): any;
++  onWorkspaceSymbol(params: any, token: any, resultProgress?: any): any;
++  onDocumentHighlight(params: any, token: any): any;
++  onPrepareRenameRequest(params: any, token: any): any;
++  onRenameRequest(params: any, token: any): any;
++  onCallHierarchyPrepare(params: any, token: any): any;
++  onCallHierarchyIncomingCalls(params: any, token: any): any;
++  onCallHierarchyOutgoingCalls(params: any, token: any): any;
++  onExecuteCommand(params: any, token: any, reporter?: any): any;
++  executeCodeAction(params: any, token: any): any;
++}

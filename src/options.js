@@ -139,13 +139,14 @@
 
   function mergeAceConfig(stored) {
     stored = stored || {};
-    const defaults = window.DEFAULT_ACE_CONFIG || { darkTheme: "ace/theme/gruvbox", lightTheme: "ace/theme/iplastic", options: {}, vimrc: "" };
+    const defaults = window.DEFAULT_ACE_CONFIG || { darkTheme: "ace/theme/gruvbox", lightTheme: "ace/theme/iplastic", options: {}, vimrc: "", lsp: true };
     return {
       darkTheme: stored.darkTheme || defaults.darkTheme,
       lightTheme: stored.lightTheme || defaults.lightTheme,
       options: Object.assign({}, defaults.options, stored.options || {}),
       // Unset -> default; a saved value wins even when empty (user cleared it).
       vimrc: typeof stored.vimrc === "string" ? stored.vimrc : defaults.vimrc,
+      lsp: typeof stored.lsp === "boolean" ? stored.lsp : defaults.lsp,
     };
   }
 
@@ -198,6 +199,7 @@
     const themes = ace.require("ace/ext/themelist").themes;
     const darkSelect = document.getElementById("ace-dark-theme");
     const lightSelect = document.getElementById("ace-light-theme");
+    const lspCheckbox = document.getElementById("ace-lsp");
     const vimrcEditor = document.getElementById("vimrc-editor");
 
     themes.forEach((t) => {
@@ -237,6 +239,7 @@
     function renderSelects() {
       darkSelect.value = current.darkTheme;
       lightSelect.value = current.lightTheme;
+      lspCheckbox.checked = current.lsp !== false;
       vimrcEditor.value = current.vimrc || "";
     }
 
@@ -261,6 +264,10 @@
     lightSelect.addEventListener("change", () => {
       current.lightTheme = lightSelect.value;
       applyToSnippetsEditor();
+      persist();
+    });
+    lspCheckbox.addEventListener("change", () => {
+      current.lsp = lspCheckbox.checked;
       persist();
     });
 

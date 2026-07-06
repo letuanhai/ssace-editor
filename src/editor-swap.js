@@ -67,14 +67,13 @@
         window.matchMedia("(prefers-color-scheme: dark)").matches;
       const editorTheme = isDarkMode ? this._darkTheme : this._lightTheme;
 
+      const resolvedMode =
+        typeof modeId === "string" && modeId.startsWith("ace/mode/") ? modeId : "ace/mode/sas";
       this.aceEditor = ace.edit(
         containerId,
         Object.assign(
           {
-            mode:
-              typeof modeId === "string" && modeId.startsWith("ace/mode/")
-                ? modeId
-                : "ace/mode/sas",
+            mode: resolvedMode,
             theme: editorTheme,
             showLineNumbers: true,
             showGutter: true,
@@ -162,6 +161,53 @@
           }
         },
       };
+
+      // SAS language server (completions/hover/diagnostics), lazy + additive -
+      // ensureLsp() itself gates on aceConfig.lsp and no-ops (resolves null) if
+      // the server bundle isn't built or the worker fails to start. Only for
+      // ace/mode/sas editors (code editor + a .sas text viewer); other file
+      // types opened as text get no LSP, matching the server's languageId.
+      this._disposed = false;
+      this._lspRegistered = false;
+      if (resolvedMode === "ace/mode/sas") {
+        ensureLsp().then((provider) => {
+          if (!provider || this._disposed) return;
+          try {
+            provider.registerEditor(this.aceEditor);
+            this._lspRegistered = true;
+            // Workaround for ace-linters 2.2.0 with completion.overwriteCompleters:
+            // false - the LSP completer is merged in alongside ace's own
+            // text/keyword/snippet completers, and the popup sorts by score, so
+            // push the default completers' scores down so LSP entries list first.
+            this.aceEditor.completers = (this.aceEditor.completers || []).map((completer) =>
+              Object.assign({}, completer, {
+                getCompletions: (ed, session, pos, prefix, callback) => {
+                  completer.getCompletions(ed, session, pos, prefix, (err, results) => {
+                    (results || []).forEach((r) => {
+                      r.score = (r.score || 0) - 1e6;
+                    });
+                    callback(err, results);
+                  });
+                },
+              }),
+            );
+            // The semanticTokens/full request ace-linters fires on registration
+            // races the server's didOpen handling and fails once; kick a refresh
+            // after the server's had time to open the document so the initial
+            // view is styled without needing an edit/scroll first.
+            setTimeout(() => {
+              if (this._disposed) return;
+              try {
+                provider.$getSessionLanguageProvider(this.aceEditor.session).getSemanticTokens();
+              } catch (e) {
+                console.warn("[SS Ext] semantic token kick failed:", e);
+              }
+            }, 2000);
+          } catch (e) {
+            console.error("[SS Ext] LSP registration failed:", e);
+          }
+        });
+      }
     }
 
     setupAceEventBindings() {
@@ -244,6 +290,16 @@
       /* no-op - Ace doesn't need deactivation */
     }
     dispose() {
+      this._disposed = true;
+      if (this._lspRegistered && ssExt._lspProvider) {
+        // ace-linters' unregisterEditor(editor, cleanupSession) closes the
+        // document server-side - must run before aceEditor.destroy() below.
+        try {
+          ssExt._lspProvider.unregisterEditor(this.aceEditor, true);
+        } catch (e) {
+          console.error("[SS Ext] LSP unregister failed:", e);
+        }
+      }
       if (this._darkModeMql) {
         this._darkModeMql.removeEventListener("change", this._darkModeHandler);
       }
@@ -520,6 +576,11 @@
       window.ace.config.setModuleUrl("ace/mode/sas", `${srcAcePath}/mode-sas.js`);
       window.ace.config.setModuleUrl("ace/snippets/sas", `${srcAcePath}/snippets-sas.js`);
     }
+    // mode-sas.js embeds Ace's own Python/Lua highlight rules for PROC PYTHON/LUA
+    // submit;...endsubmit; blocks (require("./python_highlight_rules") etc.), so
+    // those modes must already be registered before any editor is created.
+    await loadScript(`${libPath}/mode-python.js`);
+    await loadScript(`${libPath}/mode-lua.js`);
     // Note: the src-noconflict build only ever assigns window.ace - its internal
     // require/define are closure-local, so window.require/window.define (Dojo's
     // AMD loader) are never touched and don't need swapping either direction.
@@ -583,6 +644,154 @@
     } catch (e) {
       console.error("[SS Ext] Failed to apply user snippets:", e);
     }
+  }
+
+  // -- SAS language server (LSP) via ace-linters ---------------------------------
+  // Additive-only: completions/hover/diagnostics/semantic tokens layer on top of
+  // mode-sas's own highlighting; if the (gitignored, built separately by
+  // ./build_lib.sh) server bundle is missing or the worker fails, editors
+  // just work as before. One worker/LanguageProvider for the page's whole lifetime
+  // once started - ponytail: never torn down, deactivate()/reactivate() (the
+  // Phase-1 toggle) just re-registers editors against the same provider/worker.
+
+  // Semantic-token overlay colors (ace-linters renders them as CSS marker spans,
+  // session.addTextMarker - they don't replace mode-sas's own tokenizer output).
+  // The SAS LS legend uses custom token types (proc-name, sec-keyword, macro-*,
+  // ...) no ace theme knows, copied from the sas-lsp-demo's index.html.
+  const LSP_SEMANTIC_TOKEN_CSS = `
+    .ace_proc-name { color: #7a3e9d; font-weight: bold; }
+    .ace_sec-keyword { color: #0d7377; }
+    .ace_macro-keyword, .ace_macro-sec-keyword { color: #b35c00; }
+    .ace_macro-ref { color: #b35c00; font-style: italic; }
+    .ace_macro-keyword-param { color: #8a6d00; }
+    .ace_macro-comment { color: #948f8f; font-style: italic; }
+    .ace_format { color: #275fbf; font-style: italic; }
+    .ace_date, .ace_time, .ace_dt { color: #1a7f37; }
+    .ace_namelit, .ace_hex, .ace_bitmask { color: #9a3131; }
+  `;
+
+  // Returns a promise of the shared LanguageProvider, or null if LSP is disabled/
+  // unavailable. Memoized on ssExt._lspStarting so concurrent AceEditorAdapter
+  // constructions share one worker/provider instead of racing to start several;
+  // a failure sets ssExt._lspFailed permanently so it's never retried in a loop
+  // (a page reload is required to try again, e.g. after building the bundle).
+  function ensureLsp() {
+    if (getAceConfig().lsp === false) return Promise.resolve(null);
+    if (ssExt._lspStarting) return ssExt._lspStarting;
+
+    ssExt._lspStarting = (async () => {
+      if (ssExt._lspFailed) return null;
+      try {
+        // Same derivation pattern as loadNewAce's srcAcePath: strip the known
+        // suffix off libPath to get back to the extension root.
+        const extRoot = ssExt.libPath.replace(/\/lib\/ace\/src-noconflict$/, "");
+        const serverUrl = `${extRoot}/lib/sas-lsp/sas-server.js`;
+
+        try {
+          const resp = await fetch(serverUrl, { method: "HEAD" });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        } catch (e) {
+          console.warn("[SS Ext] LSP server bundle not found - run ./build_lib.sh");
+          ssExt._lspFailed = true;
+          return null;
+        }
+
+        // ace-linters' UMD wrapper checks the GLOBAL `define` and takes the AMD
+        // branch if it looks like one (`typeof define === "function" &&
+        // define.amd`) - Dojo's own loader satisfies that check, so on this page
+        // the module would register itself into Dojo's registry instead of
+        // setting window.LanguageClient/window.AceLanguageClient. Hide `define`
+        // for the two loads so the UMD wrapper falls through to its plain-global
+        // branch instead, same trick as ace.js avoiding window.require/define.
+        const savedDefine = window.define;
+        delete window.define;
+        try {
+          await loadScript(`${extRoot}/lib/ace-linters/language-client.js`);
+          await loadScript(`${extRoot}/lib/ace-linters/ace-language-client.js`);
+        } finally {
+          if (savedDefine) window.define = savedDefine;
+        }
+
+        // Blob + importScripts, not a fetched string: avoids pulling the ~22 MB
+        // bundle into a JS string just to hand it back to the Worker constructor.
+        const worker = new Worker(
+          URL.createObjectURL(
+            new Blob([`importScripts(${JSON.stringify(serverUrl)})`], { type: "text/javascript" }),
+          ),
+        );
+        worker.addEventListener("error", (e) => {
+          console.warn("[SS Ext] LSP worker error:", (e && e.message) || e);
+        });
+
+        // Workaround for ace-linters 2.2.0: its filterByFeature() checks
+        // `capabilities.hoverProvider == true`, but the SAS server advertises the
+        // LSP-spec-legal object form (e.g. {workDoneProgress: true}), so hover
+        // requests are silently never sent. Coerce object-form hoverProvider/
+        // documentHighlightProvider to true in the initialize response before
+        // ace-linters sees it. Must intercept the `onmessage` ASSIGNMENT (that's
+        // how vscode-jsonrpc's BrowserMessageReader attaches) - an
+        // addEventListener wrapper would see the message too late to matter.
+        let realOnMessage = null;
+        Object.defineProperty(worker, "onmessage", {
+          get: () => realOnMessage,
+          set: (fn) => {
+            realOnMessage = fn;
+          },
+        });
+        worker.addEventListener("message", (e) => {
+          const caps = e.data && e.data.result && e.data.result.capabilities;
+          if (caps) {
+            ["hoverProvider", "documentHighlightProvider"].forEach((k) => {
+              if (typeof caps[k] === "object" && caps[k] !== null) caps[k] = true;
+            });
+            ssExt._lspReady = true; // asserted by test/smoke.js
+          }
+          // The semanticTokens/full request ace-linters fires at registerEditor
+          // races the server's didOpen and errors ("reading 'changed'") once per
+          // editor; nothing catches the rejection, so it lands in the console as
+          // an uncaught ResponseError. Rewrite it into an empty result - a null
+          // token set is a clean no-op client-side, and the request refires on
+          // every edit/scroll (plus our 2s kick), so nothing is lost.
+          // ponytail: matched by method name in the server-built error message -
+          // this swallows ALL semanticTokens errors, not just the didOpen race.
+          const err = e.data && e.data.error;
+          if (err && typeof err.message === "string" && err.message.includes("textDocument/semanticTokens")) {
+            delete e.data.error;
+            e.data.result = null;
+          }
+          if (realOnMessage) realOnMessage.call(worker, e);
+        });
+
+        const serverData = {
+          // UMD builds loaded as classic scripts above (no bundler/dynamic
+          // import of a bare specifier) - language-client.js already set
+          // window.LanguageClient.
+          module: () => Promise.resolve({ LanguageClient: window.LanguageClient }),
+          modes: "sas",
+          type: "webworker",
+          worker,
+        };
+        const provider = window.AceLanguageClient.for(serverData, {
+          functionality: { completion: { overwriteCompleters: false }, semanticTokens: true },
+        });
+        ssExt._lspProvider = provider;
+
+        if (!ssExt._lspStyleInjected) {
+          ssExt._lspStyleInjected = true;
+          const style = document.createElement("style");
+          style.textContent = LSP_SEMANTIC_TOKEN_CSS;
+          document.head.appendChild(style);
+        }
+
+        return provider;
+      } catch (e) {
+        console.error("[SS Ext] LSP setup failed:", e);
+        ssExt._lspFailed = true;
+        return null;
+      }
+    })();
+
+    return ssExt._lspStarting;
   }
 
   // -- One-time SAS.Editor / DMSEditor patches -----------------------------------

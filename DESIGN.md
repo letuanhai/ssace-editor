@@ -1,7 +1,9 @@
 # Design plan
 
-> **Status (2026-07): historical.** Phases 1–3 shipped; only Phase 4 (LSP, optional)
-> remains open. Several features were added after this plan was written (command
+> **Status (2026-07): historical.** Phases 1–4 all shipped (Phase 4, LSP, was
+> optional and is done too — see CLAUDE.md's `editor-swap.js` bullet and README.md's
+> "SAS language server" section). Several features were added after this plan was
+> written (command
 > palette on stock ext-prompt with a global Alt+Shift+P hotkey, editable Ace text
 > viewer for "View file as text", native mouse handling toggle, persistent Ace
 > config with settings-menu persistence + vimrc via relay.js). Some names below
@@ -129,7 +131,7 @@ keeps its existing `.dijitTreeNode` wait as the readiness gate.
 Per-feature behavior is untouched; this phase relocates the menu and adds the on/off
 switches and snippet config, nothing more.
 
-## Phase 4 — SAS language server integration (optional, last)
+## Phase 4 — SAS language server integration (optional, last) — done
 
 Only if still wanted after Phases 1–3. Port the sas-lsp-demo wiring:
 

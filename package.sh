@@ -4,6 +4,16 @@
 # those and skip everything dev-only (docs, test/, SASStudio-3.82/, .git, ...).
 set -e
 cd "$(dirname "$0")"
+
+# lib/ is gitignored, generated output - (re)build it if anything is missing.
+for f in lib/ace/src-noconflict/ace.js lib/ace-linters/ace-language-client.js lib/sas-lsp/sas-server.js; do
+  if [ ! -f "$f" ]; then
+    echo "$f missing - running ./build_lib.sh"
+    ./build_lib.sh
+    break
+  fi
+done
+
 VERSION=$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' manifest.json)
 OUT="dist/sas-studio-ext-${VERSION}.zip"
 mkdir -p dist

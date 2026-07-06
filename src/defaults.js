@@ -65,4 +65,9 @@ var DEFAULT_ACE_CONFIG = {
     tabSize: 4,
   },
   vimrc: "",
+  // SAS language server (completions/hover/diagnostics via ace-linters + a web
+  // worker, see editor-swap.js's ensureLsp) - on by default, additive-only: if
+  // the server bundle isn't built (./build_lib.sh) or the worker
+  // fails, the editor just works as before.
+  lsp: true,
 };
