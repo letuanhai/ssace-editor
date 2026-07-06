@@ -89,6 +89,42 @@
     }
   }
 
+  async function loadCookies() {
+    const el = document.getElementById("cookies-text");
+    try {
+      const tab = await getActiveTab();
+      if (!tab || !tab.url) return "";
+      const cookies = await chrome.cookies.getAll({ url: tab.url });
+      const str = cookies
+        .filter((c) => c.path === "/SASStudio" && c.httpOnly)
+        .map((c) => `${c.name}=${c.value}`)
+        .join("; ");
+      el.value = str;
+      return str;
+    } catch (e) {
+      console.error("[SS Ext] popup cookie read failed:", e);
+      return "";
+    }
+  }
+
+  async function handleCopyCookies() {
+    const el = document.getElementById("cookies-text");
+    const btn = document.getElementById("cookies-copy");
+    const str = el.value || (await loadCookies());
+    if (!str) return;
+    try {
+      await navigator.clipboard.writeText(str);
+    } catch {
+      el.select();
+      document.execCommand("copy");
+    }
+    btn.textContent = "Copied";
+    setTimeout(() => (btn.textContent = "Copy"), 1200);
+  }
+
+  document.getElementById("cookies-copy").addEventListener("click", handleCopyCookies);
+  loadCookies();
+
   document.getElementById("toggle-btn").addEventListener("click", handleToggleClick);
   document.getElementById("ctxmenu-btn").addEventListener("click", handleCtxMenuClick);
   document.getElementById("palette-btn").addEventListener("click", handlePaletteClick);

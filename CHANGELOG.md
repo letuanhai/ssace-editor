@@ -7,6 +7,7 @@
 - browse_ss in-page hotkeys + SS-Ext palette entries for files/library/tabs.
 - Hotkeys capture, display, and match the Shift modifier.
 - browse_ss: Ctrl+Enter opens file as text.
+- Popup: show the SAS Studio auth cookies (path `/SASStudio`, httpOnly) with a copy button.
 
 ## 0.1
 

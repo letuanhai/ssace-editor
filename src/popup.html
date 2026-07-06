@@ -83,6 +83,41 @@
         padding: 8px 12px;
         border-top: 1px solid var(--border);
       }
+      .cookies-row {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      .cookies-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+        color: var(--hint);
+      }
+      .cookies-copy {
+        border: 1px solid var(--btn-border);
+        border-radius: 4px;
+        background: var(--btn-bg);
+        color: var(--fg);
+        cursor: pointer;
+        font-size: 12px;
+        padding: 2px 8px;
+      }
+      .cookies-copy:hover {
+        background: var(--hover);
+      }
+      .cookies-text {
+        width: 100%;
+        box-sizing: border-box;
+        resize: vertical;
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        background: var(--btn-bg);
+        color: var(--fg);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 6px;
+      }
       #options-link {
         background: none;
         border: none;
@@ -109,6 +144,13 @@
     </div>
     <div class="toggle-row">
       <button id="palette-btn" class="toggle-btn">Command palette&hellip;</button>
+    </div>
+    <div class="cookies-row">
+      <div class="cookies-head">
+        <span>Auth cookies (path /SASStudio, httpOnly)</span>
+        <button id="cookies-copy" class="cookies-copy">Copy</button>
+      </div>
+      <textarea id="cookies-text" class="cookies-text" readonly rows="2" placeholder="No SAS Studio cookies found."></textarea>
     </div>
     <footer>
       <button id="options-link">Options&hellip;</button>
