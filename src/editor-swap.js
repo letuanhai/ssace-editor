@@ -33,8 +33,20 @@
   //     ponytail: plaintext fallback, upgrade to ext-static_highlight if anyone
   //     actually complains about print output.
   // ==========================================================================
+  // Pick an ace mode from a file name via ace/ext/modelist (loaded by ext-prompt,
+  // with the SAS entry added in ace-patches.js). Unknown/no extension -> sas.
+  // ponytail: modelist can't distinguish ".txt" from "no match" (both -> text
+  // mode), so genuine .txt gets SAS highlighting too. Fine for SAS Studio.
+  function aceModeFor(name) {
+    try {
+      const m = ace.require("ace/ext/modelist").getModeForPath(name).mode;
+      if (m && m !== "ace/mode/text") return m;
+    } catch (e) {}
+    return "ace/mode/sas";
+  }
+
   class AceEditorAdapter {
-    constructor(containerId, content, langMode) {
+    constructor(containerId, content, modeId) {
       this.containerId = containerId;
       this.container = document.getElementById(containerId);
       this._isAceEditorAdapter = true;
@@ -59,7 +71,10 @@
         containerId,
         Object.assign(
           {
-            mode: "ace/mode/sas",
+            mode:
+              typeof modeId === "string" && modeId.startsWith("ace/mode/")
+                ? modeId
+                : "ace/mode/sas",
             theme: editorTheme,
             showLineNumbers: true,
             showGutter: true,
@@ -638,7 +653,7 @@
       this.editor = new AceEditorAdapter(
         this.editorDiv.id,
         this.editorContent,
-        SAS.Editor.LanguageMode.SasCode,
+        aceModeFor(this.name),
       );
       this.editor.log = this.logAreaContentPane;
 
@@ -747,7 +762,7 @@
     const adapter = new AceEditorAdapter(
       divId,
       textarea ? textarea.get("value") : "",
-      SAS.Editor.LanguageMode.SasCode,
+      aceModeFor(item && item.name),
     );
     // Always editable (like a normal editor); the dirty state drives the tab
     // marker and Save button, and Ctrl/Cmd+S / vim :w save.
@@ -1034,7 +1049,7 @@
         const newEditor = new AceEditorAdapter(
           dmsEditor.editorDiv.id,
           content,
-          SAS.Editor.LanguageMode.SasCode,
+          aceModeFor(dmsEditor.name),
         );
         dmsEditor.editor = newEditor;
 
