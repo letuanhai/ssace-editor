@@ -23,6 +23,13 @@
       hotkey: { key: "F5" },
     },
     {
+      name: "createNewFile",
+      kind: "action",
+      label: "New file",
+      title: "Create a new SAS program (same as F4 / New > SAS Program)",
+      hotkey: { key: "N", altKey: true },
+    },
+    {
       name: "openUserInputTarget",
       kind: "action",
       label: "Open input path",

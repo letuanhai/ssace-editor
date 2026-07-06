@@ -630,6 +630,10 @@ Add a prefix to the path for different option:
     );
   }
 
+  function createNewFile() {
+    window.appDMS.onNewProgram();
+  }
+
   function scrollTreeToCurrentTabItem() {
     const uri = window.appDMS.tabs.getFocusedTab().uri;
     const targetTreeId = uri.startsWith("libraries~") ? "library" : getCurrentTargetTree(["destination", "projects"]).id.split(".")[0];
@@ -789,6 +793,7 @@ Add a prefix to the path for different option:
   // ==========================================================================
   const ACTIONS = {
     reloadCurrentFile: { fn: () => reloadCurrentFile.call(window.appDMS) },
+    createNewFile: { fn: createNewFile },
     openUserInputTarget: { fn: openUserInputTarget },
     scrollTreeToCurrentTabItem: { fn: scrollTreeToCurrentTabItem },
     scrollTreeToInputPath: { fn: scrollTreeToInputPath },
