@@ -634,6 +634,60 @@ Add a prefix to the path for different option:
     window.appDMS.onNewProgram();
   }
 
+  // Poll for the Save As dialog to actually be open. postSaveAsDialog lazily
+  // requires the dialog module the first time it's used, and even once loaded
+  // the dialog only shows itself after a setTimeout, so it's never ready
+  // synchronously right after triggering saveFileAs().
+  function waitForSaveAsDialog(timeoutMs) {
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      (function poll() {
+        const saveAsDialog = window.appDMS.dialogs.saveAsDialog;
+        if (saveAsDialog && saveAsDialog.dialog.open) return resolve(saveAsDialog);
+        if (Date.now() - start > (timeoutMs ?? 3000)) return reject(new Error("Save As dialog did not open"));
+        setTimeout(poll, 50);
+      })();
+    });
+  }
+
+  // Trigger SAS Studio's own Save As flow for the currently focused editor, fill in
+  // the destination tree + filename from a typed absolute path instead of navigating
+  // the tree by hand, then complete the save exactly as clicking the dialog's Save
+  // button would - so tab rename/uri update/dirty-clearing etc. all go through SAS
+  // Studio's own code, not a reimplementation of it.
+  function saveFileAtPath() {
+    const editor = window.appDMS.tabs.getFocusedTab()?.editor;
+    if (!editor || typeof editor.saveFileAs !== "function") {
+      showNotification({ message: "No saveable file is currently focused", isError: true });
+      return;
+    }
+    showInputDialog(
+      {
+        title: "Save File At Path",
+        message: "Enter the absolute path (including file name) to save to.",
+        placeholder: "/path/to/file.sas",
+        inputName: "ssf-saveas-path",
+      },
+      function (userInput) {
+        if (!userInput) return;
+        const targetPath = resolveFilePath(userInput);
+        const dirPath = targetPath.split("/").slice(0, -1).join("/");
+        const fileName = targetPath.split("/").slice(-1)[0];
+
+        editor.saveFileAs(false);
+        waitForSaveAsDialog()
+          .then((saveAsDialog) =>
+            scrollTreeToPath(dirPath, "destination").then(() => {
+              saveAsDialog._onDestTreeClick(saveAsDialog.tree);
+              saveAsDialog.fileNameTextBox.set("value", fileName);
+              saveAsDialog.okButton.onClick();
+            }),
+          )
+          .catch((err) => showNotification({ message: err.message, isError: true }));
+      },
+    );
+  }
+
   function scrollTreeToCurrentTabItem() {
     const uri = window.appDMS.tabs.getFocusedTab().uri;
     const targetTreeId = uri.startsWith("libraries~") ? "library" : getCurrentTargetTree(["destination", "projects"]).id.split(".")[0];
@@ -795,6 +849,7 @@ Add a prefix to the path for different option:
     reloadCurrentFile: { fn: () => reloadCurrentFile.call(window.appDMS) },
     createNewFile: { fn: createNewFile },
     openUserInputTarget: { fn: openUserInputTarget },
+    saveFileAtPath: { fn: saveFileAtPath },
     scrollTreeToCurrentTabItem: { fn: scrollTreeToCurrentTabItem },
     scrollTreeToInputPath: { fn: scrollTreeToInputPath },
     scrollTreeToSelectedNode: { fn: () => scrollTreeToSelectedNode() },

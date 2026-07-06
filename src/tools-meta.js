@@ -42,6 +42,13 @@ Add a prefix to the path for different option:
       hotkey: { key: "O", altKey: true },
     },
     {
+      name: "saveFileAtPath",
+      kind: "action",
+      label: "Save file at path",
+      title: "Save the current file at the given absolute path, as if using Save As and selecting that path in the destination tree",
+      hotkey: { key: "S", altKey: true, shiftKey: true },
+    },
+    {
       name: "scrollTreeToCurrentTabItem",
       kind: "action",
       label: "Focus tree on current tab item",
