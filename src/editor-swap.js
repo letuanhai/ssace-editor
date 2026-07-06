@@ -392,6 +392,14 @@
     return typeof fs === "number" ? fs + "px" : fs || "";
   }
 
+  // Ace-settings-panel options that are deliberately NEVER saved into aceConfig:
+  // - "theme": persisted as a dark/light PAIR from the options page only (the
+  //   panel's single theme knob can't express a pair).
+  // - "mode": the language mode is per-file (SAS Studio picks it from the file
+  //   type; the SAS editor is always ace/mode/sas) - it must never become a saved
+  //   default that would force every editor to one language.
+  const NON_PERSISTED_ACE_OPTIONS = ["theme", "mode"];
+
   // -- Ace editor configuration (theme pair + generic ace options) --------------
   // Fallback mirrors defaults.js's DEFAULT_ACE_CONFIG for the (normally brief)
   // window before sw.js's onUpdated seed sets ssExt.aceConfig - MAIN-world code
@@ -1125,6 +1133,14 @@
       () => (ssExt.active ? deactivate() : activate(libPath)),
       () => (ssExt.active ? deactivate() : activate(libPath)),
     );
+    // Reflect the new state in the toolbar badge for in-page toggles (command
+    // palette etc.). MAIN world can't call chrome.action, so hop through
+    // relay.js -> sw.js. (The popup also sets the badge itself for its toggles;
+    // setting it twice to the same value is harmless.)
+    ssExt._pending.then(
+      (r) => window.postMessage({ __ssextBadge: !!(r && r.active) }, "*"),
+      () => {},
+    );
     return ssExt._pending;
   }
 
@@ -1209,7 +1225,7 @@
       const origSetOption = OptionPanel.prototype.setOption;
       OptionPanel.prototype.setOption = function (option, value) {
         origSetOption.call(this, option, value);
-        if (option.path === "theme" || option.path === "mode") return;
+        if (NON_PERSISTED_ACE_OPTIONS.includes(option.path)) return; // never persist theme/mode
         const cfg = getAceConfig();
         cfg.options[option.path] = value;
         applyAceConfig(cfg);
@@ -1339,6 +1355,8 @@
     const runners = {};
     const entries = [];
 
+    // toggleEditor + toggleNativeMouse are SSF_TOOLS actions, so they come through
+    // this loop like everything else (no special-casing needed).
     (window.SSF_TOOLS || [])
       .filter((t) => t.kind === "action")
       .forEach((tool) => {
@@ -1346,10 +1364,6 @@
         runners[key] = () => window.__ssf.run(tool.name);
         entries.push({ value: "SS-Ext: " + tool.label, meta: hotkeyHint(tool.hotkey), command: key });
       });
-    runners["ssext:toggleAce"] = () => ssExt.toggle(ssExt.libPath);
-    entries.push({ value: "SS-Ext: Toggle Ace editor", meta: "", command: "ssext:toggleAce" });
-    runners["ssext:toggleNativeMouse"] = () => window.__ssf.run("toggleNativeMouse");
-    entries.push({ value: "SS-Ext: Toggle native mouse handling", meta: "", command: "ssext:toggleNativeMouse" });
 
     if (focusedEditor) {
       getEditorCommandsByName(focusedEditor).forEach((c) => {

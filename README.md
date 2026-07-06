@@ -7,7 +7,9 @@ everything lives in the extension.
 
 ## Features
 
-- Toggle on/off with one click (popup, or Alt+Period) — no page refresh needed either direction
+- Toggle on/off with **Ctrl+.** (rebindable in the options page) or the popup's
+  toggle button — no page refresh needed either direction; the toolbar badge
+  updates either way
 - Toolbar badge shows `ON` while Ace is active for that tab
 - SAS syntax highlighting (`ace/mode/sas`) and snippets, user-configurable from the options page
 - Applies to every open tab and to new tabs opened while active
@@ -16,9 +18,8 @@ everything lives in the extension.
 - ~25 UX fixes/quick actions (tab management, tree navigation, keyboard shortcuts,
   clipboard, context menus) — quick actions live in the command palette, on/off
   toggles and hotkey rebinding live in the options page
-- Command palette (popup button, global hotkey **Alt+Shift+P** — rebindable in
-  the options page like any other action — or an unassigned
-  `chrome://extensions/shortcuts` command) works even with no Ace editor focused:
+- Command palette (popup button, or global hotkey **Alt+Shift+P** — rebindable in
+  the options page like any other action) works even with no Ace editor focused:
   it lists every `SS-Ext: ...` action plus, if an Ace editor (code or text
   viewer) was focused when it opened, that editor's own commands applied to it
 - While Ace is active, "View file as text" opens in an editable Ace editor that
@@ -79,15 +80,14 @@ the page is reloaded.
 ## Usage
 
 1. Open SAS Studio and let it fully load
-2. Click the extension icon to open the popup, then "Toggle Ace editor" (or press
-   **Alt+Period** directly) to toggle Ace on
-3. Click again (or Alt+Period again) to toggle back to the original editor
-4. Use the popup's "Command palette…" button (**Alt+Shift+P**, or bind the
-   `command_palette` command at `chrome://extensions/shortcuts`) for quick actions (reload file,
-   focus tree, close tab, ...) and, when an Ace editor is focused, that editor's
-   own commands; use the options page (link in the popup, or right-click the
-   icon → Options) to turn UX patches on/off, rebind hotkeys, or edit custom
-   snippets
+2. Press **Ctrl+.** (or open the popup via the extension icon and click "Toggle
+   Ace editor") to toggle Ace on
+3. Press **Ctrl+.** again (or use the popup) to switch back to the original editor
+4. Use the popup's "Command palette…" button (or **Alt+Shift+P** directly) for
+   quick actions (reload file, focus tree, close tab, ...) and, when an Ace
+   editor is focused, that editor's own commands; use the options page (link in
+   the popup, or right-click the icon → Options) to turn UX patches on/off,
+   rebind hotkeys, or edit custom snippets
 
 ## How It Works
 
@@ -118,9 +118,7 @@ Clicking the toolbar button injects `editor-swap.js` into the page's MAIN world
 The file/library/tab browsers are `ss-fixes.js` actions (`browseFiles` /
 `browseLibrary` / `browseTabs`, default **Alt+P** / **Alt+O** / **Alt+T**) —
 rebindable in the options page like any other action, and listed as
-`SS-Ext: Browse …` entries in the command palette. The `browse_files` /
-`browse_library` / `browse_tabs` chrome commands remain as unbound alternatives
-(assignable at `chrome://extensions/shortcuts`).
+`SS-Ext: Browse …` entries in the command palette.
 
 Once a browse prompt is open, these keys act on the selected entry (a compact
 legend is also shown at the bottom of the prompt):
@@ -214,7 +212,7 @@ development-only (docs, `test/`, extracted app source). Within the runtime tree:
 
 No build step, no Tampermonkey needed. To test changes: reload the unpacked
 extension in `chrome://extensions/`, refresh the SAS Studio page, and toggle
-(popup or Alt+Period). Logs are prefixed `[SS Ext]` — one line per toggle
+from the popup. Logs are prefixed `[SS Ext]` — one line per toggle
 (`activated`/`deactivated ... N tab(s) ...`), plus errors and warnings for
 unexpected states.
 

@@ -118,7 +118,9 @@ ace.define("ace/ext/browse_ss", [], function (require, exports, module) {
 
         // Initialize key bindings
         const keys = {
-            "Enter": accept,
+            // NB: don't bind `accept` directly - ace passes the editor as the first
+            // arg, which would make accept()'s `asText` always truthy (open as text).
+            "Enter": function () { accept(); },
             // Open file as text
             "Ctrl-Enter": function () { accept(true) },
             // Scroll tree to selected item

@@ -176,6 +176,20 @@ Add a prefix to the path for different option:
       title: "Switch between open SAS Studio tabs",
       hotkey: { key: "T", altKey: true },
     },
+    {
+      name: "toggleEditor",
+      kind: "action",
+      label: "Toggle Ace editor",
+      title: "Toggle the SAS Studio editor between Ace and the built-in editor",
+      hotkey: { key: ".", ctrlKey: true },
+    },
+    {
+      name: "toggleNativeMouse",
+      kind: "action",
+      label: "Toggle native mouse handling",
+      title: "Toggle native browser mouse/gesture handling (drag-select, context menus)",
+      hotkey: null, // unbound by default; assignable in the options page
+    },
 
     // -- Patches - passive behavior changes, applied once at init ----------------
     {

@@ -885,6 +885,12 @@ Add a prefix to the path for different option:
     browseTabs: {
       fn: () => window.__ssExt && window.__ssExt.browse && window.__ssExt.browse("tabs"),
     },
+    toggleEditor: {
+      // Toggle the Ace editor replacement on/off (same as the popup's toggle
+      // button). editor-swap.js is pre-injected with libPath seeded by sw.js on
+      // page load, and toggle() posts the new state so the toolbar badge updates.
+      fn: () => window.__ssExt && window.__ssExt.toggle && window.__ssExt.toggle(window.__ssExt.libPath),
+    },
     toggleNativeMouse: {
       // Live "native mouse handling" toggle, no reload. When ON, a window-capture
       // handler stops PROPAGATION (never preventDefault) of the mouse-gesture

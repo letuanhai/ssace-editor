@@ -18,24 +18,7 @@
     "default_popup": "src/popup.html"
   },
   "commands": {
-    "toggle_editor": {
-      "suggested_key": {
-        "default": "Ctrl+Period"
-      },
-      "description": "Toggle the Ace editor"
-    },
-    "browse_files": {
-      "description": "Browse SAS Studio files"
-    },
-    "browse_library": {
-      "description": "Browse SAS Studio library items"
-    },
-    "browse_tabs": {
-      "description": "Select SAS Studio tabs"
-    },
-    "command_palette": {
-      "description": "Open the SS Ext command palette"
-    }
+    "_execute_action": {}
   },
   "background": {
     "service_worker": "src/sw.js"

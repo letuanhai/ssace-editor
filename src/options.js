@@ -9,6 +9,11 @@
 
   const MODIFIER_KEYS = new Set(["Alt", "Control", "Meta", "Shift"]);
 
+  // Ace-settings-panel options never saved into aceConfig (mirrors editor-swap.js):
+  // "theme" is the options-page dark/light pair only; "mode" is per-file language,
+  // never a saved default. Must stay in sync with editor-swap.js's copy.
+  const NON_PERSISTED_ACE_OPTIONS = ["theme", "mode"];
+
   function hotkeyLabel(hotkey) {
     if (!hotkey || !hotkey.key) return "(unbound)";
     let name = hotkey.key;
@@ -279,7 +284,7 @@
         const origSetOption = OptionPanel.prototype.setOption;
         OptionPanel.prototype.setOption = function (option, value) {
           origSetOption.call(this, option, value);
-          if (option.path === "theme" || option.path === "mode") return;
+          if (NON_PERSISTED_ACE_OPTIONS.includes(option.path)) return; // never persist theme/mode
           current.options[option.path] = value;
           persist();
         };

@@ -1,4 +1,4 @@
-- [ ] move all ace modifications to src/ so that lib/ is not modified
-- [ ] remove all commands from extension hotkey config (in browser config) except to activate the extension popup
-- [ ] when saving ace config, `mode` config should be excluded. This seems to already has been the current behaviour, but still should check again and be explicit about it.
-- [ ] bug: in `browse_ss`, `accept()` receives `editor` as the first argument so `asText` paramter is always true, should change the function for open file as text
+- [x] move all ace modifications to src/ so that lib/ is not modified
+- [x] remove all commands from extension hotkey config (in browser config) except to activate the extension popup
+- [x] when saving ace config, `mode` config should be excluded. This seems to already has been the current behaviour, but still should check again and be explicit about it.
+- [x] bug: in `browse_ss`, `accept()` receives `editor` as the first argument so `asText` paramter is always true, should change the function for open file as text

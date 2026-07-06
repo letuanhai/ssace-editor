@@ -1,26 +1,23 @@
 /**
  * Background service worker.
  *
- * Four independent jobs:
+ * Three independent jobs (the editor toggle / browse / command-palette are all
+ * driven from the page now - the popup button for the toggle, in-page ss-fixes
+ * hotkeys for browse/palette - so the service worker no longer registers any
+ * chrome.commands handler; the only browser command is _execute_action, which
+ * Chrome handles itself to open the popup):
  *
- * 1. Editor toggle (Alt+Period / toggle_editor command, or the popup's toggle
- *    button): inject editor-swap.js (idempotent - no-ops if already present),
- *    then call window.__ssExt.toggle(libPath, snippetsText) in the page to flip
- *    Ace on/off. The returned { active } state drives the per-tab badge.
- *    browse_files/library/tabs commands do the same inject step, then call
- *    window.__ssExt.browse(kind, libPath, snippetsText) instead.
- *
- * 2. ss-fixes injection: on every SASStudio page load (tabs.onUpdated), inject
+ * 1. ss-fixes injection: on every SASStudio page load (tabs.onUpdated), inject
  *    tools-meta.js + ss-fixes.js into the MAIN world and call
  *    window.__ssf.init(settings) with the persisted patch/hotkey settings.
  *    The same handler pre-injects editor-swap.js and seeds
  *    libPath/userSnippets/aceConfig so the global command-palette hotkey works
  *    without a prior toggle.
  *
- * 3. Live snippet apply: when chrome.storage.local's `snippets` changes, push
+ * 2. Live snippet apply: when chrome.storage.local's `snippets` changes, push
  *    the new text into every open SASStudio tab via window.__ssExt.applySnippets.
  *
- * 4. Live ace config apply: when chrome.storage.local's `aceConfig` changes
+ * 3. Live ace config apply: when chrome.storage.local's `aceConfig` changes
  *    (from the in-page settings panel via relay.js, or from options.html),
  *    push the merged config into every open SASStudio tab via
  *    window.__ssExt.applyAceConfig.
@@ -30,41 +27,14 @@ importScripts("defaults.js");
 
 const LIB_PATH = "/lib/ace/src-noconflict";
 
-async function injectAndRun(tabId, func, args) {
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    files: ["src/ace-patches.js", "src/editor-swap.js"],
-    world: "MAIN",
-  });
-
-  const [{ result }] = await chrome.scripting.executeScript({
-    target: { tabId },
-    func,
-    args,
-    world: "MAIN",
-  });
-  return result;
-}
-
-async function setBadge(tabId, active) {
-  await chrome.action.setBadgeText({ tabId, text: active ? "ON" : "" });
-}
-
-async function showErrorAlert(tabId, message) {
-  try {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      func: (errorMsg) => {
-        console.error("[SS Ext]", errorMsg);
-        alert(`SS Ext error:\n${errorMsg}\n\nCheck the browser console for details.`);
-      },
-      args: [message],
-      world: "MAIN",
-    });
-  } catch (e) {
-    console.error("[SS Ext] Could not show error to user:", e);
+// In-page editor toggles (command palette etc.) run in the MAIN world and can't
+// call chrome.action, so editor-swap.js posts { __ssextBadge } -> relay.js
+// -> here to update the per-tab ON/OFF toolbar badge. (The popup sets its own.)
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (msg && msg.ssextBadge !== undefined && sender.tab && sender.tab.id !== undefined) {
+    chrome.action.setBadgeText({ tabId: sender.tab.id, text: msg.ssextBadge ? "ON" : "" });
   }
-}
+});
 
 // Unset storage -> defaults; a saved value wins even when empty (user cleared).
 async function getSnippetsText() {
@@ -90,43 +60,6 @@ async function getAceConfig() {
   const { aceConfig } = await chrome.storage.local.get("aceConfig");
   return mergeAceConfig(aceConfig);
 }
-
-const BROWSE_COMMANDS = {
-  browse_files: "files",
-  browse_library: "library",
-  browse_tabs: "tabs",
-};
-
-chrome.commands.onCommand.addListener(async (command, tab) => {
-  if (!tab || tab.id === undefined) return;
-
-  try {
-    const libPath = chrome.runtime.getURL(LIB_PATH);
-    const snippetsText = await getSnippetsText();
-
-    if (command === "command_palette") {
-      await injectAndRun(tab.id, (path) => window.__ssExt.commandPalette(path), [libPath]);
-      return;
-    }
-
-    let result;
-    if (command === "toggle_editor") {
-      result = await injectAndRun(tab.id, (path, snippets) => window.__ssExt.toggle(path, snippets), [libPath, snippetsText]);
-    } else {
-      const kind = BROWSE_COMMANDS[command];
-      if (!kind) return;
-      result = await injectAndRun(tab.id, (browseKind, path, snippets) => window.__ssExt.browse(browseKind, path, snippets), [
-        kind,
-        libPath,
-        snippetsText,
-      ]);
-    }
-    await setBadge(tab.id, result && result.active);
-  } catch (error) {
-    console.error("[SS Ext] Error handling command:", command, error);
-    await showErrorAlert(tab.id, error.message);
-  }
-});
 
 // -- ss-fixes injection on every SASStudio page load ---------------------------
 
