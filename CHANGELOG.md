@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3
+
+- New file action (Alt+N / command palette): create a new SAS program, same as F4.
+- Save file at path action (Alt+Shift+S / command palette): drives SAS Studio's own
+  Save As dialog from a typed absolute path (destination tree + filename), then
+  confirms it, so tab rename/dirty-clearing/uri update all go through SAS Studio's
+  own code.
+- Editor: pick the Ace syntax mode from the file's extension instead of always
+  defaulting to SAS.
+
 ## 0.2
 
 - In-page hotkeys for editor/native-mouse toggles, badge bridge, browser-command cleanup.
