@@ -8,5 +8,5 @@ VERSION=$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' manifest.json)
 OUT="dist/sas-studio-ext-${VERSION}.zip"
 mkdir -p dist
 rm -f "$OUT"
-zip -qr "$OUT" manifest.json src assets lib README.md LICENSE
+zip -qr "$OUT" manifest.json src assets lib README.md LICENSE CHANGELOG.md
 echo "Wrote $OUT ($(du -h "$OUT" | cut -f1))"
