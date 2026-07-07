@@ -135,7 +135,7 @@ switches and snippet config, nothing more.
 
 Only if still wanted after Phases 1–3. Port the sas-lsp-demo wiring:
 
-- Ship `lsp/sas-server.js` (built by `build-lsp.sh`, ~22 MB, stays generated/gitignored)
+- Ship `lib/sas-lsp/sas-server.js` (built by `./build_lib.sh`, ~22 MB, stays generated/gitignored)
   and the ace-linters client as web-accessible resources.
 - Spike first: a page can't construct a `Worker` from a `chrome-extension://` URL —
   verify the blob-URL workaround against the live instance's CSP

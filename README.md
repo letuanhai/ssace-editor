@@ -1,7 +1,7 @@
 # SS Ext
 
 A browser extension that toggles SAS Studio 3.8's built-in editor for a modern Ace
-editor at runtime (SAS syntax highlighting, configurable snippets), plus ~25
+editor at runtime (SAS syntax highlighting, configurable snippets), plus various
 independent UX fixes for the rest of SAS Studio. No Tampermonkey install needed —
 everything lives in the extension.
 
@@ -20,7 +20,7 @@ everything lives in the extension.
 - Applies to every open tab and to new tabs opened while active
 - Text, cursor position, and dirty (`*`) state are preserved across a toggle;
   undo history is not (see Known Limitations)
-- ~25 UX fixes/quick actions (tab management, tree navigation, keyboard shortcuts,
+- Various UX fixes/quick actions (tab management, tree navigation, keyboard shortcuts,
   clipboard, context menus) — quick actions live in the command palette, on/off
   toggles and hotkey rebinding live in the options page
 - Command palette (popup button, or global hotkey **Alt+Shift+P** — rebindable in
@@ -155,7 +155,7 @@ browse prompts work even while the built-in editor is still in use.
 ## UX fixes and configuration
 
 `ss-fixes.js` (injected automatically on every SAS Studio page load) provides
-~25 independent fixes on top of the editor toggle: tab management, tree
+various independent fixes on top of the editor toggle: tab management, tree
 navigation, keyboard shortcuts, clipboard, context menus. Quick actions
 (reload file, close tab, focus tree, ...) live in the command palette
 (Alt+Shift+P), each with its default hotkey shown alongside. Passive patches (confirm-on-drop,
@@ -200,7 +200,7 @@ first if `lib/` is incomplete, and leaving out everything development-only
   in-page settings panel (MAIN world) to `chrome.storage.local.aceConfig`
 - `editor-swap.js` — `AceEditorAdapter`, the `window.__ssExt` singleton, the
   one-time SAS.Editor/DMSEditor patches, and the settings-menu persistence hook
-- `ss-fixes.js` — ~25 UX fixes, split into one-shot `ACTIONS` and passive `PATCHES`
+- `ss-fixes.js` — various UX fixes, split into one-shot `ACTIONS` and passive `PATCHES`
 - `tools-meta.js` — shared `SSF_TOOLS` metadata (labels/titles/hotkeys) for
   ss-fixes, the popup, and the options page
 - `defaults.js` — shared `DEFAULT_SAS_SNIPPETS`/`DEFAULT_ACE_CONFIG` defaults

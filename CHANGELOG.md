@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4
 
 - SAS language server integration (Phase 4): `ace/mode/sas` editors get LSP-backed
   completions, hover, diagnostics, and semantic highlighting via `ace-linters` and
@@ -10,6 +10,10 @@
   built (`./build_lib.sh`) or a worker failure just logs a warning and
   leaves the editor working as before. mode-sas.js gained embedded Python/Lua
   highlighting for `PROC PYTHON`/`PROC LUA` `submit;...endsubmit;` blocks.
+- `lib/` is now gitignored, generated output. `./build_lib.sh` is the single place
+  third-party library versions (ace-builds, ace-linters, the SAS language server)
+  are recorded and rebuilt; `package.sh` runs it automatically if `lib/` is
+  incomplete.
 
 ## 0.3
 

@@ -1,2 +1,0 @@
-- [x] add ss-ext tool (command palette + hotkey) to create new file (similar to SAS Studio defaul F4 hotkey or select New->SAS Program)
-- [x] add ss-ext tool to save file at specified absolute path that behave as if i used the "Save As" dialog and selected that path from the file tree so that the following up behaviour is correctly handled by SAS Studio
